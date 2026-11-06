@@ -1,0 +1,635 @@
+/* ══════════════════════════════════════════════════════════════════════
+   PORTFOLIO — traitement « catalogue raisonne »
+
+   Le portfolio retrace une pratique : il se lit comme un livre d'atelier,
+   pas comme une grille de vignettes. Trois partis, tous structurels (la
+   palette et les polices restent celles de styles.css, CSP oblige) :
+
+     1. TOUT CE QUI EST CHIFFRE EST EN MONOSPACE. Numeros de planche,
+        comptes, index. C'est le vocabulaire du dessin technique, et c'est
+        vrai du sujet : ces pieces sont cotees avant d'etre belles.
+     2. LES FILETS PORTENT LA STRUCTURE, pas les cartes. Un catalogue se
+        tient par ses reglures ; les ombres et les fonds colores font
+        « site web », le filet fait « planche ».
+     3. CONTRASTE D'ECHELLE MAXIMAL. Labels minuscules en capitales
+        espacees contre titres larges. Entre les deux, du blanc.
+
+   Corrige au passage deux restes d'un theme sombre : .pf-card avait un
+   fond rgba(255,255,255,.04) et .pf-table une bordure rgba(255,255,255,.12),
+   tous deux invisibles sur le papier creme du site.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Jetons propres au portfolio ────────────────────────────────────── */
+.pf-titre,
+.pf-chapitre,
+.pf-grid,
+.pf-fiche {
+  --pf-cote: 11px;              /* taille des mentions chiffrees */
+  --pf-suite: 0.14em;           /* interlettrage des capitales */
+}
+
+/* ── Page de titre ──────────────────────────────────────────────────── */
+/* Une couverture, pas un hero : le nom de la collection, le titre, et
+   l'etat des lieux chiffre. Rien d'autre au-dessus de la ligne de flottaison. */
+.pf-titre {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: clamp(48px, 9vw, 104px) 22px clamp(30px, 5vw, 54px);
+}
+
+.pf-titre .pf-collection {
+  margin: 0 0 clamp(22px, 5vw, 44px);
+  font-family: var(--font-mono);
+  font-size: var(--pf-cote);
+  letter-spacing: var(--pf-suite);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pf-titre h1 {
+  max-width: 17ch;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(38px, 8vw, 88px);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+  color: var(--ink);
+}
+
+.pf-titre .pf-chapo {
+  max-width: 60ch;
+  margin: clamp(20px, 3vw, 30px) 0 0;
+  font-size: clamp(16px, 1.6vw, 18.5px);
+  line-height: 1.62;
+  color: var(--ink-dim);
+}
+
+/* L'etat des lieux : trois mesures, alignees sur un filet. C'est la page
+   de garde d'un catalogue, elle annonce le volume avant de l'ouvrir. */
+.pf-releve {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, max-content));
+  gap: 0 clamp(26px, 6vw, 72px);
+  margin: clamp(34px, 5vw, 54px) 0 0;
+  /* padding a zero : sans cela le retrait par defaut d'un <ul> desaligne
+     les chiffres du filet qui les surmonte. */
+  padding: 18px 0 0;
+  border-top: 1px solid var(--ink);
+  list-style: none;
+}
+
+.pf-releve li {
+  padding: 6px 0;
+}
+
+.pf-releve b {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: clamp(22px, 3vw, 30px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.pf-releve span {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: var(--pf-cote);
+  letter-spacing: var(--pf-suite);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── Chapitres ──────────────────────────────────────────────────────── */
+/* La numerotation romaine dit quelque chose de vrai : ce sont trois
+   pratiques distinctes, pas trois etapes d'un processus. */
+.pf-chapitre {
+  max-width: 1180px;
+  margin: clamp(56px, 8vw, 96px) auto 0;
+  padding: 0 22px;
+}
+
+.pf-chapitre-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px 24px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ink);
+}
+
+.pf-chapitre-tete h2 {
+  flex: 1 1 320px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 3.2vw, 34px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+
+.pf-chapitre-tete h2::before {
+  content: attr(data-rang);
+  display: block;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: var(--pf-cote);
+  font-weight: 500;
+  letter-spacing: var(--pf-suite);
+  color: var(--purple);
+}
+
+.pf-chapitre-tete .pf-compte {
+  font-family: var(--font-mono);
+  font-size: var(--pf-cote);
+  letter-spacing: var(--pf-suite);
+  text-transform: uppercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pf-chapitre .pf-note {
+  max-width: 58ch;
+  margin: 16px 0 0;
+  font-size: 15.5px;
+  line-height: 1.62;
+  color: var(--ink-dim);
+}
+/* Mots mis en avant dans une note de chapitre (05/11) : encre pleine, graisse
+   moderee, pour qu'ils ressortent sans alourdir le paragraphe. */
+.pf-chapitre .pf-note strong { color: var(--ink); font-weight: 600; }
+
+/* ── Les planches ───────────────────────────────────────────────────── */
+/* Numerotation continue sur les trois chapitres : une piece porte le meme
+   numero d'un bout a l'autre du catalogue. D'ou le compteur sur <main>. */
+main {
+  counter-reset: planche;
+}
+
+.pf-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+  gap: clamp(26px, 3.4vw, 44px) clamp(20px, 2.6vw, 32px);
+  margin-top: clamp(28px, 4vw, 40px);
+}
+
+/* Sur telephone, deux planches par ligne plutot qu'une : une vignette
+   pleine largeur cesse d'etre une planche de catalogue pour devenir une
+   affiche, et l'on perd la lecture par serie. */
+@media (max-width: 560px) {
+  .pf-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 14px;
+  }
+
+  .pf-card .pf-nom {
+    font-size: 14px;
+  }
+
+  .pf-card figcaption {
+    gap: 3px 7px;
+    padding: 10px 10px 12px;
+  }
+}
+
+.pf-card {
+  display: block;
+  counter-increment: planche;
+  text-decoration: none;
+  color: inherit;
+}
+
+.pf-card figure {
+  margin: 0;
+  /* 13/10/2026 : le cadre et le fond passent de l'image a la FIGURE, pour que
+     l'image et sa legende forment une seule planche blanche. Avant, un filet
+     noir separait la photo du texte et la legende flottait sur le papier. */
+  background: var(--panel);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  transition: border-color 0.35s ease;
+}
+
+/* 15/09 : cadre CARRE, rempli par une image DEJA carree. Les couvertures
+   sont produites par deploy/couvertures-carrees.py, centrees sur l'objet, fond
+   prolonge si l'objet deborde. Le navigateur n'a plus rien a rogner ni a
+   combler : `cover` ne sert que de filet de securite. */
+.pf-card img,
+.pf-card video {   /* 04/11 : vignette animee (K1 sur l'accueil), memes regles que l'image */
+  display: block;
+  width: 100%;
+  /* `height: auto` OBLIGATOIRE : les vignettes portent width/height="800"
+     (pour reserver la place au chargement). Sans lui, l'attribut height
+     l'emporte sur aspect-ratio et chaque cadre s'etire a 800 px de haut. */
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  object-position: 50% 50%;
+  background: var(--soft);
+  transition: filter 0.35s ease;
+}
+
+.pf-card figcaption {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 12px 13px 14px;
+}
+
+/* Le numero de planche, tire du compteur : jamais saisi a la main, donc
+   jamais faux apres un ajout ou un retrait de piece. */
+.pf-card figcaption::before {
+  content: counter(planche, decimal-leading-zero);
+  grid-row: 1 / span 2;
+  font-family: var(--font-mono);
+  font-size: var(--pf-cote);
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pf-card .pf-nom {
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.pf-card .pf-type {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: var(--pf-suite);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pf-card:hover img,
+.pf-card:hover video,
+.pf-card:focus-visible img,
+.pf-card:focus-visible video {
+  filter: brightness(1.04) saturate(1.05);
+}
+
+.pf-card:hover figure,
+.pf-card:focus-visible figure {
+  border-color: rgba(21, 19, 26, 0.3);
+}
+
+.pf-card:hover .pf-nom,
+.pf-card:focus-visible .pf-nom {
+  color: var(--purple);
+}
+
+.pf-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+/* ── Colophon ───────────────────────────────────────────────────────── */
+.pf-colophon {
+  max-width: 1180px;
+  margin: clamp(64px, 9vw, 104px) auto 0;
+  padding: 20px 22px clamp(20px, 4vw, 34px);
+}
+
+.pf-colophon p {
+  max-width: 62ch;
+  margin: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--muted);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   FICHE — la monographie d'une piece
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Le titre passe sous la cote, aligne a gauche, plutot que le
+   space-between herite de .section-head (qui envoie le h2 a droite, pense
+   pour les sections d'accueil avec un bouton en face). */
+.section-head.pf-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.section-head.pf-head h2 {
+  font-size: clamp(30px, 5.4vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -0.032em;
+  max-width: 20ch;
+}
+
+/* La cote : numero de planche et typologie. Meme vocabulaire que l'index,
+   pour qu'une fiche isolee se rattache visiblement au volume. */
+.pf-head .pf-cote {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* La fiche prend la meme mesure que le catalogue : une piece isolee doit
+   se lire comme une page arrachee au meme volume, pas comme une autre page. */
+.section.pf-fiche {
+  max-width: 1180px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 22px;
+  padding-right: 22px;
+}
+
+/* Retour au catalogue : un repere de pagination, pas un bouton. Il precede
+   la cote comme un folio precede le contenu d'une page. */
+.pf-back {
+  display: inline-block;
+  margin: 0 0 clamp(20px, 3vw, 30px);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 3px;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.pf-back::before {
+  content: "\2190\00a0\00a0";
+}
+
+.pf-back:hover,
+.pf-back:focus-visible {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+/* .eyebrow porte une pastille ::before sur tout le site. Sur une cote
+   chiffree elle parasite l'alignement monospace : on la retire ici. */
+.pf-head .pf-cote::before {
+  content: none;
+}
+
+/* Le texte de la piece : colonne etroite, corps genereux. C'est le seul
+   endroit du portfolio ou l'on lit vraiment, il merite sa mesure. */
+.pf-lead {
+  max-width: 58ch;
+  margin: clamp(20px, 3vw, 30px) 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--ink);
+  color: var(--ink-dim);
+  font-size: clamp(16px, 1.55vw, 18px);
+  line-height: 1.68;
+}
+/* Un chapeau en deux paragraphes (06/11) : le second suit le premier sans
+   repeter le filet ni la marge d'ouverture. */
+.pf-lead + .pf-lead {
+  margin-top: 14px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.pf-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  align-items: start;
+  gap: clamp(14px, 2vw, 22px);
+  margin-top: clamp(30px, 4.5vw, 48px);
+  max-width: 960px;
+}
+
+/* 29/08 : la galerie imposait un cadre portrait 3/4 avec `object-fit: cover`,
+   alors que les photos de planches sont en paysage (rapports mesures de 1,25 a
+   1,42). Chaque image etait donc rognee sur les cotes, jusqu'a la moitie de sa
+   largeur pour les plus larges : un yacht de 24 metres photographie en long
+   n'etait jamais visible en entier. On rend a l'image son rapport naturel ;
+   la grille a deja `align-items: start`, les hauteurs peuvent donc differer
+   sans casser l'alignement. */
+.pf-gallery img {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: var(--soft);
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 640px) {
+  .pf-gallery {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 04/11 (Baptiste : « dans Affiches il y a un trou, remonte les deux images en
+   bas a droite ») : cette planche enchaine un portrait, quatre paysages et un
+   portrait ; en grille a deux colonnes, le portrait de gauche laissait un vide
+   sous le paysage de droite. Ici les images coulent en deux colonnes (flux
+   continu, pas de rangees) : les hauteurs s'equilibrent et plus rien ne
+   baille. Reserve aux planches qui melangent les formats. */
+.pf-gallery--colonnes {
+  display: block;
+  columns: 2;
+  column-gap: clamp(14px, 2vw, 22px);
+}
+.pf-gallery--colonnes img {
+  break-inside: avoid;
+  margin-bottom: clamp(14px, 2vw, 22px);
+}
+@media (max-width: 640px) {
+  .pf-gallery--colonnes {
+    columns: 1;
+  }
+}
+
+/* 04/11 : videos de fiche (K1) : trois enregistrements recadres, en marche et
+   en fabrication. Trois colonnes pour ne laisser aucun vide ; la premiere
+   rangee de la fiche, avant les photos. */
+.pf-gallery--videos {
+  grid-template-columns: repeat(3, 1fr);
+}
+.pf-gallery video {
+  width: 100%;
+  height: auto;
+  display: block;
+  background: transparent;   /* 04/11 (Baptiste) : aucun liseré noir autour des vidéos, sur tout le site */
+  border: 0;
+}
+
+/* 04/11 : Pattern watch, trois photos de rapports voisins mais pas égaux :
+   trois colonnes, même cadre 3:4, chaque photo le remplit. */
+.pf-gallery--trois {
+  grid-template-columns: repeat(3, 1fr);
+}
+.pf-gallery--egales img {
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+/* 04/11 (Baptiste, EX P1) : trois vignettes cote a cote de meme hauteur, au format des videos portrait (720 x 1056) */
+.pf-gallery--portrait img,
+.pf-gallery--portrait video {
+  aspect-ratio: 720 / 1056;
+  object-fit: cover;
+}
+@media (max-width: 640px) {
+  .pf-gallery--trois {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .pf-gallery--videos {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Tableaux de fiche ──────────────────────────────────────────────── */
+.pf-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pf-table th,
+.pf-table td {
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.93rem;
+  vertical-align: top;
+}
+
+.pf-table th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pf-fill {
+  border: 1px dashed rgba(189, 79, 28, 0.5);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  color: var(--purple);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-card img,
+  .pf-card video {
+    transition: none;
+  }
+}
+
+/* ── Expertise (15/09) ──────────────────────────────────────────────── */
+/* Vingt-cinq competences en vrac ne se lisent pas. Regroupees en quatre
+   metiers, elles disent l'ordre reel d'un developpement. */
+.pf-expertise {
+  max-width: 1180px;
+  margin: clamp(40px, 6vw, 72px) auto 0;
+  padding: 0 22px;
+}
+
+.pf-expertise-titre {
+  margin: 0;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--ink);
+  font-family: var(--font-display);
+  font-size: clamp(22px, 3.2vw, 34px);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+}
+
+.pf-metiers {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 clamp(18px, 3vw, 36px);
+}
+
+.pf-metier {
+  padding-top: 20px;
+}
+
+.pf-metier h3 {
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: var(--pf-cote);
+  font-weight: 500;
+  letter-spacing: var(--pf-suite);
+  text-transform: uppercase;
+  color: var(--purple);
+}
+
+.pf-metier ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pf-metier li {
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink-dim);
+}
+
+.pf-appel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px 32px;
+  margin-top: clamp(28px, 4vw, 44px);
+  padding: clamp(20px, 3vw, 28px) 0 0;
+  border-top: 1px solid var(--ink);
+}
+
+.pf-appel p {
+  flex: 1 1 420px;
+  max-width: 64ch;
+  margin: 0;
+  font-size: clamp(15.5px, 1.5vw, 17px);
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+@media (max-width: 900px) {
+  .pf-metiers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .pf-metiers {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* deux paragraphes de chapo : le second suit le premier sans le grand saut
+   prevu pour le titre */
+.pf-titre .pf-chapo + .pf-chapo {
+  margin-top: 14px;
+}
+
+

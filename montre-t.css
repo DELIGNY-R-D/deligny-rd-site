@@ -1,0 +1,32 @@
+/* Montre T, le concept (13/10) : images de la page, sur la mise en page du livre blanc */
+.mt .lb-chap h3 { margin: 1.4em 0 .4em; font-size: 1.05rem; }
+.mt-fig { margin: 2rem auto; max-width: 860px; padding: 0 16px; }
+.mt-fig img { display: block; width: 100%; height: auto; border-radius: 14px; background: #000; }
+.mt-fig figcaption { margin-top: .6rem; font-size: .9rem; opacity: .75; text-align: center; }
+.mt-fig--hero { max-width: 980px; }
+.mt-fig--portrait { max-width: 620px; }
+.mt-galerie { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 980px; margin: 2rem auto; padding: 0 16px; }
+.mt-galerie img { display: block; width: 100%; height: auto; border-radius: 12px; }
+@media (max-width: 700px) { .mt-galerie { grid-template-columns: 1fr; } }
+.mt-galerie--2 { grid-template-columns: repeat(2, 1fr); max-width: 860px; }
+.mt-legende { text-align: center; margin: -1rem auto 2rem; font-size: .92rem; }
+.mt-galerie--k1 { grid-template-columns: repeat(3, 1fr); }
+.mt-galerie--k1 figure { margin: 0; }
+.mt-galerie--k1 figcaption { margin-top: .4rem; font-size: .85rem; opacity: .75; text-align: center; }
+@media (max-width: 700px) { .mt-galerie--k1 { grid-template-columns: 1fr 1fr; } }
+/* (13/10) galeries : toutes les photos a la meme taille (3:4 recadre), alignees ; derniere rangee centree */
+.mt-galerie img, .mt-galerie--k1 figure img { aspect-ratio: 3 / 4; object-fit: cover; }
+/* 05/11 : les deux premieres vues K1 sont des videos (boucles muettes), memes regles que les images */
+.mt-galerie--k1 figure video { display: block; width: 100%; height: auto; border-radius: 12px; aspect-ratio: 3 / 4; object-fit: cover; }
+.mt-galerie--k1 { display: flex; flex-wrap: wrap; justify-content: center; }
+.mt-galerie--k1 figure { flex: 0 0 calc((100% - 24px) / 3); }
+@media (max-width: 700px) { .mt-galerie--k1 figure { flex-basis: calc((100% - 12px) / 2); } }
+.mt-liens { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin: -0.5rem auto 2.5rem; padding: 0 16px; }
+.mt-liens--gauche { justify-content: flex-start; margin: 1rem 0 0; padding: 0; }
+/* (13/10) mis en avant : personnalisation et bracelet, juste sous l'image d'ouverture */
+.mt-avant { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; max-width: 980px; margin: 2.5rem auto 3rem; padding: 0 16px; }
+.mt-carte { background: rgba(255,255,255,.55); border: 1px solid rgba(0,0,0,.08); border-radius: 18px; padding: 26px 28px; box-shadow: 0 10px 30px rgba(0,0,0,.06); }
+.mt-carte h2 { margin: .2em 0 .5em; font-size: 1.6rem; line-height: 1.15; }
+.mt-carte p { line-height: 1.6; }
+.mt-carte--principale { background: linear-gradient(135deg, rgba(44,74,56,.10), rgba(255,255,255,.6)); border-color: rgba(44,74,56,.25); }
+@media (max-width: 760px) { .mt-avant { grid-template-columns: 1fr; } .mt-carte { padding: 20px; } }

@@ -1,0 +1,1942 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow" />
+<title>General Design Studio - DELIGNY R&amp;D</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; form-action 'none'; img-src 'self' data: blob: https://atlas-studio.pro; style-src-elem 'unsafe-inline'; style-src-attr 'unsafe-inline'; script-src-elem 'self' blob: 'unsafe-inline'; script-src-attr 'unsafe-inline'; connect-src http://localhost:4555 http://127.0.0.1:4555 https://moteur.deligny-rd.fr">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: #fff; color: #1a1a1a; font-family: 'Inter', sans-serif; font-size: 13px; overflow: hidden; }
+
+/* ── TOPBAR ──────────────────────────────────────────── */
+#topbar {
+  height: 36px; border-bottom: 1px solid #ebebeb;
+  display: flex; align-items: center; padding: 0 14px; gap: 10px; user-select: none;
+}
+.logo { font-weight: 500; font-size: 12px; letter-spacing: .08em; color: #1a1a1a; }
+.sep  { width: 1px; height: 14px; background: #e0e0e0; }
+#blender-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: #d4d4d4; flex-shrink: 0; transition: background .4s;
+}
+#blender-dot.ok  { background: #22c55e; }
+#blender-dot.err { background: #ef4444; }
+#blender-label { font-size: 10px; color: #aaa; font-family: 'DM Mono', monospace; letter-spacing: .04em; }
+.tb-btn {
+  height: 22px; padding: 0 9px; border: 1px solid #e0e0e0; border-radius: 4px;
+  background: #fff; color: #444; font-size: 11px; cursor: pointer; font-family: 'Inter', sans-serif; transition: background .1s;
+}
+.tb-btn:hover { background: #f5f5f5; }
+.tb-btn.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.tb-btn.primary:hover { background: #333; }
+.tb-btn:disabled { opacity: .35; cursor: default; }
+
+/* ── LAYOUT ──────────────────────────────────────────── */
+#main { height: calc(100vh - 36px); display: flex; }
+
+/* TELEPHONE (25/08) : en portrait, la barre d'outils et le panneau de chat
+   encadraient la scene et il ne restait qu'une bande de quelques pixels pour
+   l'objet. On empile : outils en bandeau horizontal defilant, la scene prend
+   la place restante, le chat passe dessous en hauteur limitee. dvh et non vh
+   pour exclure les barres du navigateur mobile. */
+@media (max-width: 860px) {
+  #main { flex-direction: column; height: calc(100dvh - 36px); }
+  #toolbar {
+    width: 100%; height: auto; max-height: 74px;
+    flex-direction: row; align-items: center; gap: 10px;
+    overflow-x: auto; overflow-y: hidden;
+    border-right: 0; border-bottom: 1px solid #ebebeb;
+    padding: 6px 8px; flex: 0 0 auto;
+  }
+  #toolbar .tg { display: flex; flex-direction: row; gap: 4px; margin: 0; }
+  #toolbar .tg-title { display: none; }        /* les intitules de groupe mangent la largeur */
+  #viewports { flex: 1 1 auto; min-height: 0; }
+  #chat {
+    width: 100%; flex: 0 0 auto; max-height: 32dvh;
+    border-left: 0; border-top: 1px solid #ebebeb;
+  }
+}
+
+/* Paysage : l'ecran est bas, on rend la hauteur a la scene et le chat
+   retrouve sa colonne, plus etroite. */
+@media (max-width: 980px) and (orientation: landscape) {
+  #main { flex-direction: row; height: calc(100dvh - 36px); }
+  #toolbar {
+    width: auto; max-height: none; flex-direction: column;
+    overflow-x: hidden; overflow-y: auto;
+    border-right: 1px solid #ebebeb; border-bottom: 0;
+  }
+  #toolbar .tg { flex-direction: column; }
+  #chat { width: 232px; max-height: none; border-left: 1px solid #ebebeb; border-top: 0; }
+}
+
+/* ── TOOLBAR ─────────────────────────────────────────── */
+#toolbar {
+  width: 80px; border-right: 1px solid #ebebeb;
+  overflow-y: auto; overflow-x: hidden;
+  background: #fdfdfd; flex-shrink: 0; padding-bottom: 16px;
+}
+#toolbar::-webkit-scrollbar { width: 3px; }
+#toolbar::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 2px; }
+
+.tg { padding: 8px 6px 4px; }
+.tg-label {
+  font-size: 7.5px; letter-spacing: .10em; color: #c0c0c0;
+  font-family: 'DM Mono', monospace; text-transform: uppercase;
+  padding: 0 2px 5px; user-select: none;
+}
+.tg-sep { height: 1px; background: #ebebeb; margin: 2px 4px 0; }
+.tg-row { display: flex; gap: 4px; margin-bottom: 4px; }
+
+.tool-btn {
+  flex: 1; height: 28px; border: 1px solid #e8e8e8; border-radius: 4px;
+  background: #fff; color: #555; font-size: 13px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .1s, border-color .1s, color .1s;
+  user-select: none;
+}
+.tool-btn:hover { background: #f0f0f0; border-color: #ccc; color: #222; }
+.tool-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.tool-btn.stub { color: #bbb; border-color: #f0f0f0; }
+.tool-btn.stub:hover { background: #f7f7f7; color: #888; border-color: #ddd; }
+.tool-btn.fw { flex: none; width: 100%; }
+
+/* ── VIEWPORTS ───────────────────────────────────────── */
+#viewports { flex: 1; position: relative; overflow: hidden; background: #f9f9f9; }
+#main-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.vdiv { position: absolute; background: #e8e8e8; pointer-events: none; }
+#vdiv-v { left: 50%; top: 0; bottom: 0; width: 1px; }
+#vdiv-h { top: 50%; left: 0; right: 0; height: 1px; }
+.vp-label {
+  position: absolute; font-size: 9px; font-family: 'DM Mono', monospace;
+  color: #c8c8c8; letter-spacing: .08em; pointer-events: none; padding: 6px 8px;
+}
+#lbl-front { top:0; left:0; }
+#lbl-side  { top:0; left:50%; }
+#lbl-top   { top:50%; left:0; }
+#lbl-back  { top:50%; left:50%; }
+
+#view-toggle {
+  position: absolute; top: 8px; right: 8px; z-index: 10;
+  height: 24px; padding: 0 10px; border: 1px solid #d8d8d8; border-radius: 4px;
+  background: rgba(255,255,255,.9); color: #444; font-size: 11px; font-family: 'Inter', sans-serif;
+  cursor: pointer; backdrop-filter: blur(4px); display: flex; align-items: center; gap: 5px; transition: background .1s;
+}
+#view-toggle:hover { background: rgba(240,240,240,.95); }
+
+/* ── FLOATING PANELS ─────────────────────────────────── */
+.fp {
+  position: absolute; left: 92px; top: 44px;
+  background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;
+  padding: 10px 12px; z-index: 50; box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  display: none; min-width: 160px;
+}
+.fp-title { font-size: 11px; font-weight: 500; color: #1a1a1a; margin-bottom: 8px; letter-spacing: .03em; }
+.fp-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.fp-row label { font-size: 10px; color: #999; width: 40px; flex-shrink: 0; font-family: 'DM Mono', monospace; }
+.fp-row input[type=number] {
+  flex: 1; height: 22px; border: 1px solid #e0e0e0; border-radius: 3px;
+  padding: 0 6px; font-size: 11px; font-family: 'DM Mono', monospace; outline: none; color: #1a1a1a;
+}
+.fp-row input[type=number]:focus { border-color: #aaa; }
+.fp-row input[type=range] { flex: 1; }
+.fp-row span { font-size: 10px; font-family: 'DM Mono', monospace; color: #555; width: 30px; }
+.fp-hint { font-size: 9px; color: #aaa; margin-bottom: 6px; font-style: italic; line-height: 1.3; }
+.fp-actions { display: flex; gap: 5px; margin-top: 8px; }
+.fp-actions button {
+  flex: 1; height: 24px; border: 1px solid #e0e0e0; border-radius: 4px;
+  background: #fff; color: #444; font-size: 10px; cursor: pointer; font-family: 'Inter', sans-serif; transition: background .1s;
+}
+.fp-actions button:hover { background: #f5f5f5; }
+.fp-actions button.ok { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.fp-actions button.ok:hover { background: #333; }
+#measure-dims { font-size: 11px; font-family: 'DM Mono', monospace; color: #333; line-height: 2; }
+
+/* ── CHAT ────────────────────────────────────────────── */
+#chat { width: 276px; border-left: 1px solid #ebebeb; display: flex; flex-direction: column; background: #fff; }
+#messages { flex: 1; overflow-y: auto; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+#messages::-webkit-scrollbar { width: 4px; }
+#messages::-webkit-scrollbar-thumb { background: #e4e4e4; border-radius: 2px; }
+.msg { display: flex; flex-direction: column; gap: 2px; }
+.msg.user { align-items: flex-end; }
+.msg.user .bubble {
+  background: #1a1a1a; color: #fff;
+  padding: 7px 11px; border-radius: 12px 12px 2px 12px;
+  font-size: 12px; line-height: 1.5; max-width: 220px;
+}
+.msg.ai .bubble { color: #333; font-size: 12px; line-height: 1.6; }
+.msg.system .bubble { color: #aaa; font-size: 10px; font-family: 'DM Mono', monospace; }
+#empty {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 10px; text-align: center; padding: 24px; color: #c0c0c0;
+}
+#empty .hint { font-size: 11px; line-height: 1.7; }
+.hint-ex { font-size: 10px; font-family: 'DM Mono', monospace; color: #d0d0d0; cursor: pointer; }
+.hint-ex:hover { color: #999; }
+#input-row { border-top: 1px solid #ebebeb; padding: 9px 10px; display: flex; gap: 6px; align-items: flex-end; }
+#prompt {
+  flex: 1; border: 1px solid #e8e8e8; border-radius: 6px;
+  padding: 7px 10px; font-family: 'Inter', sans-serif; font-size: 12px;
+  resize: none; min-height: 34px; max-height: 96px; outline: none; line-height: 1.5; color: #1a1a1a;
+}
+#prompt:focus { border-color: #c0c0c0; }
+#send-btn {
+  width: 28px; height: 28px; border: none; background: #1a1a1a; color: #fff; border-radius: 5px;
+  cursor: pointer; font-size: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+}
+#send-btn:hover { background: #333; }
+#send-btn:disabled { background: #ddd; cursor: default; }
+
+/* ── DESIGN HEALTH ───────────────────────────────────── */
+#design-health {
+  border-top: 1px solid #ebebeb;
+  padding: 10px 12px 8px;
+  flex-shrink: 0;
+  background: #fafafa;
+}
+.dh-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+.dh-title  { font-size:8px; letter-spacing:.13em; font-family:'DM Mono',monospace; color:#bbb; text-transform:uppercase; user-select:none; }
+.dh-machine-label { font-size:9px; font-family:'DM Mono',monospace; color:#d4d4d4; }
+.dh-row { display:flex; align-items:center; gap:7px; padding:3px 0; border-bottom:1px solid #f2f2f2; cursor:default; }
+.dh-row:last-of-type { border-bottom:none; }
+.dh-row.metric { border-top:1px solid #f0f0f0; margin-top:3px; padding-top:4px; }
+.dh-dot { font-size:9px; flex-shrink:0; transition:color .35s; width:10px; text-align:center; }
+.dh-dot.pass { color:#22c55e; } .dh-dot.warn { color:#7e57c2; }
+.dh-dot.fail { color:#ef4444; } .dh-dot.na   { color:#d8d8d8; }
+.dh-dot.icon { color:#c0c0c0; font-size:10px; }
+.dh-key { flex:1; font-size:11px; color:#888; white-space:nowrap; }
+.dh-val { font-family:'DM Mono',monospace; font-size:11px; color:#444; text-align:right; white-space:nowrap; }
+.dh-val.pass { color:#22c55e; } .dh-val.warn { color:#7e57c2; }
+.dh-val.fail { color:#ef4444; } .dh-val.na   { color:#ccc; }
+
+.dh-reglages { display:flex; gap:4px; margin-top:6px; }
+.dh-reglages select { flex:1; font:10px 'DM Mono',monospace; color:#555; background:#fafafa; border:1px solid #e6e6e6; border-radius:3px; padding:2px 3px; min-width:0; }
+#dh-constats { margin-top:6px; display:flex; flex-direction:column; gap:3px; }
+.dh-constat { font-size:10px; line-height:1.4; color:#555; padding:3px 6px; border-left:2px solid #ddd; background:#fafafa; border-radius:0 3px 3px 0; }
+.dh-constat.HARD { border-left-color:#ef4444; } .dh-constat.SOFT { border-left-color:#7e57c2; } .dh-constat.OPT { border-left-color:#3b82f6; } .dh-constat.INFO { border-left-color:#d8d8d8; color:#888; }
+.dh-cid { font-family:'DM Mono',monospace; font-size:9px; color:#999; margin-right:4px; }
+.dh-csugg { display:block; color:#999; font-size:9.5px; }
+.dh-actions { display:flex; gap:6px; margin-top:7px; }
+.dh-btn { flex:1; font:10px system-ui; color:#444; background:#fff; border:1px solid #ddd; border-radius:4px; padding:4px 6px; text-align:center; text-decoration:none; cursor:pointer; }
+.dh-btn:hover { border-color:#7e57c2; color:#7e57c2; }
+.dh-note { font-size:9px; color:#aaa; margin-top:6px; line-height:1.4; }
+.tb-beta { font:500 10px system-ui; color:#7e57c2; letter-spacing:.04em; margin-left:8px; }
+
+/* ── TOAST ───────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #1a1a1a; color: #fff; padding: 7px 18px; border-radius: 20px;
+  font-size: 11px; z-index: 999; opacity: 0; transition: opacity .25s; pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="logo">GDS</span>
+  <div class="sep"></div>
+  <!-- VITRINE : le pont Blender pousse la geometrie vers une instance locale
+       via un serveur. Le portail est statique : ces boutons echoueraient a
+       chaque clic, on ne les montre donc pas. Ils restent dans la version
+       complete. -->
+  <div id="blender-dot" style="display:none"></div>
+  <span id="blender-label" style="display:none">BLENDER</span>
+  <button class="tb-btn" onclick="connectBlender()" style="display:none">Connecter</button>
+  <button class="tb-btn primary" id="btn-push" onclick="pushToBlender()" disabled style="display:none">→ Blender</button>
+  <span style="font:500 11px system-ui;color:#8a8a8a;letter-spacing:.06em">STUDIO DE CONCEPTION GENERATIVE</span>
+  <div class="sep"></div>
+  <label class="tb-btn" title="Analyser un STL : fermeture, surplombs, orientation, parois, coût. Le fichier reste dans le navigateur.">Importer un STL<input type="file" id="stl-file" accept=".stl" onchange="window.importerSTL(this)" style="display:none"></label>
+  <span class="tb-beta">bêta publique</span>
+</div>
+
+<div id="main">
+
+  <!-- ── TOOLBAR ────────────────────────────── -->
+  <div id="toolbar">
+
+    <div class="tg">
+      <div class="tg-label">Modélisation</div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="extrusion" title="Extrusion">▲↑</button>
+        <button class="tool-btn stub" data-tool="revolution" title="Révolution">↻</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="balayage" title="Balayage">≋</button>
+        <button class="tool-btn stub" data-tool="lissage" title="Lissage">≈</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn" data-tool="helico" title="Hélicoïde">⊛</button>
+        <button class="tool-btn stub" data-tool="gravure" title="Gravure">⊙</button>
+      </div>
+    </div>
+
+    <div class="tg-sep"></div>
+    <div class="tg">
+      <div class="tg-label">Modifications</div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="conge" title="Congé">⌒</button>
+        <button class="tool-btn stub" data-tool="chanfrein" title="Chanfrein">◺</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="coque" title="Coque">⬡</button>
+        <button class="tool-btn stub" data-tool="depouille" title="Dépouille">▽</button>
+      </div>
+    </div>
+
+    <div class="tg-sep"></div>
+    <div class="tg">
+      <div class="tg-label">Booléennes</div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="combiner" title="Combiner">⊕</button>
+        <button class="tool-btn stub" data-tool="scission" title="Scission">⊖</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="direct" title="Direct">✎</button>
+        <button class="tool-btn stub" data-tool="supprface" title="Supprimer la face">✕</button>
+      </div>
+    </div>
+
+    <div class="tg-sep"></div>
+    <div class="tg">
+      <div class="tg-label">Esquisse</div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="ligne" title="Ligne">╱</button>
+        <button class="tool-btn stub" data-tool="cercle" title="Cercle">○</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="arc" title="Arc">⌓</button>
+        <button class="tool-btn stub" data-tool="rect" title="Rectangle">▭</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="texte" title="Texte">A</button>
+        <button class="tool-btn stub" data-tool="point" title="Point">·</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="projeter" title="Projeter la géométrie">⬇</button>
+        <button class="tool-btn stub" data-tool="cote" title="Cote">↔</button>
+      </div>
+    </div>
+
+    <div class="tg-sep"></div>
+    <div class="tg">
+      <div class="tg-label">Réseau</div>
+      <div class="tg-row">
+        <button class="tool-btn" data-tool="resrect" title="Réseau rectangulaire">⊞</button>
+        <button class="tool-btn" data-tool="rescirc" title="Réseau circulaire">⊜</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn stub" data-tool="ajuster" title="Ajuster">✂</button>
+        <button class="tool-btn stub" data-tool="prolonger" title="Prolonger">↦</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn" data-tool="decalage" title="Décalage">⊢</button>
+        <button class="tool-btn" data-tool="miroir" title="Mise en miroir">⊣⊢</button>
+      </div>
+    </div>
+
+    <div class="tg-sep"></div>
+    <div class="tg">
+      <div class="tg-label">Transformations</div>
+      <div class="tg-row">
+        <button class="tool-btn" data-tool="move" title="Déplacer">✛</button>
+        <button class="tool-btn" data-tool="copy" title="Copier">⊡</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn" data-tool="rotate" title="Rotation">↺</button>
+        <button class="tool-btn" data-tool="scale" title="Échelle">⤢</button>
+      </div>
+    </div>
+
+    <div class="tg-sep"></div>
+    <div class="tg">
+      <div class="tg-label">Affichage</div>
+      <div class="tg-row">
+        <button class="tool-btn active" data-mode="shaded" title="Ombré">●</button>
+        <button class="tool-btn" data-mode="edges" title="Ombré + arêtes">◈</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn" data-mode="wireframe" title="Filaire">◇</button>
+        <button class="tool-btn" data-tool="section" title="Affichage en coupe">⊘</button>
+      </div>
+      <div class="tg-row">
+        <button class="tool-btn fw" data-tool="measure" title="Mesurer">↔ Mesurer</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── VIEWPORTS ──────────────────────────── -->
+  <div id="viewports">
+    <canvas id="main-canvas"></canvas>
+    <div class="vdiv" id="vdiv-v"></div>
+    <div class="vdiv" id="vdiv-h"></div>
+    <div class="vp-label" id="lbl-front">FACE</div>
+    <div class="vp-label" id="lbl-side">CÔTÉ</div>
+    <div class="vp-label" id="lbl-top">DESSUS</div>
+    <div class="vp-label" id="lbl-back">DERRIÈRE</div>
+    <button id="view-toggle" onclick="toggleView()">⬜ 3D libre</button>
+
+    <!-- Panel : Déplacer / Rotation / Échelle -->
+    <div class="fp" id="fp-transform">
+      <div class="fp-title" id="fpt-title">Déplacer</div>
+      <div class="fp-row">
+        <label id="fpt-xl" for="fpt-x">X (mm)</label>
+        <input id="fpt-x" type="number" value="0" step="1" oninput="applyTransform()">
+      </div>
+      <div class="fp-row">
+        <label id="fpt-yl" for="fpt-y">Y (mm)</label>
+        <input id="fpt-y" type="number" value="0" step="1" oninput="applyTransform()">
+      </div>
+      <div class="fp-row">
+        <label id="fpt-zl" for="fpt-z">Z (mm)</label>
+        <input id="fpt-z" type="number" value="0" step="1" oninput="applyTransform()">
+      </div>
+      <div class="fp-actions">
+        <button onclick="resetTransform()">Reset</button>
+        <button class="ok" onclick="closeTransform()">OK</button>
+      </div>
+    </div>
+
+    <!-- Panel : Mesurer -->
+    <div class="fp" id="fp-measure">
+      <div class="fp-title">Mesures</div>
+      <div id="measure-dims">—</div>
+      <div class="fp-actions">
+        <button class="ok" onclick="toggleMeasure()">Fermer</button>
+      </div>
+    </div>
+
+    <!-- Panel : Hélicoïde -->
+    <div class="fp" id="fp-helico">
+      <div class="fp-title">Hélicoïde</div>
+      <div class="fp-row"><label for="hel-R">Rayon</label><input id="hel-R" type="number" value="30" step="1"></div>
+      <div class="fp-row"><label for="hel-r">Fil r</label><input id="hel-r" type="number" value="4" step="0.5"></div>
+      <div class="fp-row"><label for="hel-T">Spires</label><input id="hel-T" type="number" value="5" step="1"></div>
+      <div class="fp-row"><label for="hel-H">Hauteur</label><input id="hel-H" type="number" value="90" step="5"></div>
+      <div class="fp-actions">
+        <button onclick="closePanel('fp-helico')">Annuler</button>
+        <button class="ok" onclick="applyHelico()">Générer</button>
+      </div>
+    </div>
+
+    <!-- Panel : Réseau rectangulaire -->
+    <div class="fp" id="fp-resrect">
+      <div class="fp-title">Réseau rectangulaire</div>
+      <div class="fp-row"><label for="rr-cols">Colonnes</label><input id="rr-cols" type="number" value="3" min="1" step="1"></div>
+      <div class="fp-row"><label for="rr-rows">Lignes</label><input id="rr-rows" type="number" value="2" min="1" step="1"></div>
+      <div class="fp-row"><label for="rr-ex">Esp. X</label><input id="rr-ex" type="number" value="60" step="5"></div>
+      <div class="fp-row"><label for="rr-ez">Esp. Z</label><input id="rr-ez" type="number" value="60" step="5"></div>
+      <div class="fp-actions">
+        <button onclick="closePanel('fp-resrect')">Annuler</button>
+        <button class="ok" onclick="applyResRect()">Appliquer</button>
+      </div>
+    </div>
+
+    <!-- Panel : Réseau circulaire -->
+    <div class="fp" id="fp-rescirc">
+      <div class="fp-title">Réseau circulaire</div>
+      <div class="fp-row"><label for="rc-n">Copies</label><input id="rc-n" type="number" value="6" min="2" max="36" step="1"></div>
+      <div class="fp-row"><label for="rc-r">Rayon</label><input id="rc-r" type="number" value="80" step="5"></div>
+      <div class="fp-actions">
+        <button onclick="closePanel('fp-rescirc')">Annuler</button>
+        <button class="ok" onclick="applyResCirc()">Appliquer</button>
+      </div>
+    </div>
+
+    <!-- Panel : Décalage -->
+    <div class="fp" id="fp-decalage">
+      <div class="fp-title">Décalage (offset)</div>
+      <div class="fp-row">
+        <label for="dec-slider">Dist.</label>
+        <input id="dec-slider" type="range" min="-30" max="80" value="0"
+          oninput="previewDecalage(this.value); document.getElementById('dec-val').textContent=this.value+'mm'">
+        <span id="dec-val">0mm</span>
+      </div>
+      <div class="fp-actions">
+        <button onclick="cancelDecalage()">Annuler</button>
+        <button class="ok" onclick="commitDecalage()">OK</button>
+      </div>
+    </div>
+
+    <!-- Panel : Affichage en coupe -->
+    <div class="fp" id="fp-section">
+      <div class="fp-title">Coupe</div>
+      <div class="fp-row">
+        <label for="sec-slider">Plan Y</label>
+        <input id="sec-slider" type="range" min="-200" max="200" value="0"
+          oninput="updateSection(this.value); document.getElementById('sec-val').textContent=this.value+'mm'">
+        <span id="sec-val">0mm</span>
+      </div>
+      <div class="fp-actions">
+        <button class="ok" onclick="toggleSection()">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- Extrusion -->
+    <div class="fp" id="fp-extrusion">
+      <div class="fp-title">Extrusion</div>
+      <div class="fp-row"><label for="ext-h">Hauteur</label><input id="ext-h" type="number" value="30" min="1" max="500"><span>mm</span></div>
+      <div class="fp-row"><label for="ext-bevel">Biseau</label><input id="ext-bevel" type="checkbox"></div>
+      <div class="fp-hint">Dessinez un Cercle ou Rectangle dans la vue Face</div>
+      <div class="fp-actions"><button onclick="closePanel('fp-extrusion')">Annuler</button><button class="ok" onclick="applyExtrusion()">Extruder</button></div>
+    </div>
+    <!-- Révolution -->
+    <div class="fp" id="fp-revolution">
+      <div class="fp-title">Révolution</div>
+      <div class="fp-row"><label for="rev-angle">Angle</label><input id="rev-angle" type="number" value="360" min="1" max="360"><span>°</span></div>
+      <div class="fp-row"><label for="rev-segs">Segments</label><input id="rev-segs" type="number" value="48" min="4" max="128"></div>
+      <div class="fp-hint">Dessinez un profil (Lignes) dans la vue Face — côté droit</div>
+      <div class="fp-actions"><button onclick="closePanel('fp-revolution')">Annuler</button><button class="ok" onclick="applyRevolution()">Générer</button></div>
+    </div>
+    <!-- Coque -->
+    <div class="fp" id="fp-coque">
+      <div class="fp-title">Coque</div>
+      <div class="fp-row"><label for="coque-t">Épaisseur</label><input id="coque-t" type="number" value="3" min="0.5" max="30"><span>mm</span></div>
+      <div class="fp-actions"><button onclick="closePanel('fp-coque')">Annuler</button><button class="ok" onclick="applyCoque()">Appliquer</button></div>
+    </div>
+    <!-- Dépouille -->
+    <div class="fp" id="fp-depouille">
+      <div class="fp-title">Dépouille</div>
+      <div class="fp-row"><label for="dep-angle">Angle</label><input id="dep-angle" type="number" value="5" min="0.5" max="45"><span>°</span></div>
+      <div class="fp-actions"><button onclick="closePanel('fp-depouille')">Annuler</button><button class="ok" onclick="applyDepouille()">Appliquer</button></div>
+    </div>
+    <!-- Congé -->
+    <div class="fp" id="fp-conge">
+      <div class="fp-title">Congé</div>
+      <div class="fp-row"><label for="conge-passes">Passes</label><input id="conge-passes" type="number" value="2" min="1" max="6"></div>
+      <div class="fp-actions"><button onclick="closePanel('fp-conge')">Annuler</button><button class="ok" onclick="applyConge()">Appliquer</button></div>
+    </div>
+    <!-- Texte 3D -->
+    <div class="fp" id="fp-texte">
+      <div class="fp-title">Texte 3D</div>
+      <div class="fp-row"><label for="txt-val">Texte</label><input id="txt-val" type="text" value="GDS" style="width:72px"></div>
+      <div class="fp-row"><label for="txt-size">Taille</label><input id="txt-size" type="number" value="30" min="1" max="300"><span>mm</span></div>
+      <div class="fp-row"><label for="txt-h">Hauteur</label><input id="txt-h" type="number" value="8" min="1" max="60"><span>mm</span></div>
+      <div class="fp-actions"><button onclick="closePanel('fp-texte')">Annuler</button><button class="ok" onclick="applyTexte()">Générer</button></div>
+    </div>
+
+  <!-- ── CHAT ──────────────────────────────── -->
+  <div id="chat">
+    <div id="messages">
+      <div id="empty">
+        <div class="hint">Décris un objet à générer</div>
+        <span class="hint-ex" onclick="fillPrompt('lampe cylindrique 180 mm')">lampe cylindrique 180 mm</span>
+        <span class="hint-ex" onclick="fillPrompt('vase nervuré hauteur 220 mm')">vase nervuré hauteur 220 mm</span>
+        <span class="hint-ex" onclick="fillPrompt('engrenage 24 dents module 2')">engrenage 24 dents module 2</span>
+        <span class="hint-ex" onclick="fillPrompt('support tablette incliné 15°')">support tablette incliné 15°</span>
+      </div>
+    </div>
+    <!-- ── DESIGN HEALTH ─────────────────────── -->
+    <div id="design-health" style="display:none">
+      <div class="dh-header">
+        <span class="dh-title">DESIGN HEALTH</span>
+        <span class="dh-machine-label">Ender-3 S1 · PLA · ∅0.4</span>
+      </div>
+      <div class="dh-row">
+        <span class="dh-dot na" id="dh-geo-dot">●</span>
+        <span class="dh-key">Géométrie</span>
+        <span class="dh-val na" id="dh-geo-val">—</span>
+      </div>
+      <div class="dh-row">
+        <span class="dh-dot na" id="dh-print-dot">●</span>
+        <span class="dh-key">Impression</span>
+        <span class="dh-val na" id="dh-print-val">—</span>
+      </div>
+      <div class="dh-row">
+        <span class="dh-dot na" id="dh-asm-dot">●</span>
+        <span class="dh-key">Assemblage</span>
+        <span class="dh-val na" id="dh-asm-val">N/A</span>
+      </div>
+      <div class="dh-row metric">
+        <span class="dh-dot icon">◈</span>
+        <span class="dh-key">Coût mat.</span>
+        <span class="dh-val" id="dh-cost-val">—</span>
+      </div>
+      <div class="dh-row">
+        <span class="dh-dot icon">◷</span>
+        <span class="dh-key">Temps impr.</span>
+        <span class="dh-val" id="dh-time-val">—</span>
+      </div>
+      <div class="dh-reglages">
+        <select id="dh-machine" onchange="window.relancerRapport()" title="Imprimante"><option value="bambu_a1">Bambu Lab A1</option><option value="bambu_a1mini">Bambu Lab A1 mini</option><option value="prusa_mk4">Prusa MK4</option><option value="ender3_s1">Ender-3 S1</option></select>
+        <select id="dh-matiere" onchange="window.relancerRapport()" title="Matière"><option>PLA</option><option>PETG</option><option>ABS</option><option>ASA</option><option>TPU</option></select>
+        <select id="dh-buse" onchange="window.relancerRapport()" title="Buse"><option value="0.4">∅0.4</option><option value="0.6">∅0.6</option><option value="0.2">∅0.2</option></select>
+      </div>
+      <div id="dh-constats"></div>
+      <div class="dh-actions">
+        <button class="dh-btn" onclick="window.telechargerRapport()">Rapport JSON</button>
+        <a class="dh-btn" href="../contact.html?sujet=piece-certifiee">Demander une pièce certifiée</a>
+      </div>
+      <div class="dh-note">Bêta publique · le même format de constats que notre atelier · votre fichier ne quitte pas le navigateur.</div>
+    </div>
+
+    <div id="input-row">
+      <textarea id="prompt" placeholder="Décris un objet…" rows="1"></textarea>
+      <button id="send-btn" onclick="sendPrompt()">↑</button>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "../nano-worlds/vendor/three.module.js",
+  "three/addons/": "../nano-worlds/vendor/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildShape } from './lib/shapes_cad.js?v=f40ecbe1';   // lot F1 (coques fermees, gyroide ferme)
+import * as FAB from './fabricabilite.js?v=c911748e';           // rapport de fabricabilite, beta publique
+import { buildLampMesh } from './lib/lamp_cad.js?v=4a21222a';     // le moteur /api/intent repond parfois « lamp » : ce type n'est pas dans shapes_cad
+
+/* ── COPILOTE HORS LIGNE (vitrine deligny-rd.fr) ──────────────────────────
+ * La version applicative envoie la phrase a /api/intent, qui la traduit en
+ * {type, params}. Le portail est statique : pas de backend. La geometrie et
+ * les reglages etant deja calcules ici, il suffit de remplacer cette
+ * traduction par une lecture par mots-cles.
+ *
+ * Les types sont ceux que buildShape sait REELLEMENT construire (24 formes,
+ * voir shapes_cad.js). Piege corrige le 25/08 : la premiere version reprenait
+ * la liste de la v3 et proposait « lamp », qui n'existe pas ici — la v4
+ * repondait « Shape inconnue ». Il n'y a pas de lampe entiere dans la
+ * bibliotheque : une lampe s'y dessine comme un abat-jour (shade). */
+const VITRINE_TYPES = [
+  ['lamp_kinetic',      ['cinetique','cinétique','mobile','rotatif','tournant']],
+  ['shade_lamelles',    ['lamelle','lamelles','claustra','persienne','stries','strie']],
+  ['penrose_shade',     ['penrose','pavage','quasi-cristal']],
+  ['phyllotaxis_shade', ['phyllotaxie','tournesol','graines','fibonacci']],
+  ['shade_facette',     ['facette','facettes','facette','origami','polygonal']],
+  ['shade',             ['abat-jour','abat jour','abatjour','lampe','luminaire','suspension','suspendue','diffuseur','applique','lampadaire']],
+  ['phi_vase',          ['nombre d\'or','nombre d or','vase dore','proportion doree']],
+  ['vase',              ['vase','pot','cache-pot','soliflore','jardiniere','jardinière']],
+  ['golden_helix',      ['helice','hélice','spirale','torsade','vrille']],
+  ['gyroid_shell',      ['gyroide','gyroïde','coque','lattice','treillis','structure']],
+  ['hex_panel',         ['hexagone','hexagonal','nid d\'abeille','nid d abeille','panneau']],
+  ['shelf',             ['etagere','étagère','tablette','rayonnage','plateau mural']],
+  ['bracket',           ['equerre','équerre','support','patte','fixation','ferrure']],
+  ['table',             ['table','bureau','console','gueridon','guéridon']],
+  ['chair',             ['chaise','siege','siège','tabouret','assise','fauteuil']],
+  ['vehicle_4x4',       ['vehicule','véhicule','voiture','4x4','buggy','camion']],
+  ['gear',              ['engrenage','pignon','roue dentee','roue dentée','denture']],
+  ['spring',            ['ressort','spire','amortisseur']],
+  ['torus',             ['tore','anneau','donut','couronne']],
+  ['tube',              ['tube','tuyau','conduit','manchon']],
+  ['cone',              ['cone','cône','conique','entonnoir']],
+  ['sphere',            ['sphere','sphère','boule','globe','bille']],
+  ['spline_lathe',      ['revolution','révolution','tourne','tourné','profil']],
+  ['box',               ['boite','boîte','bac','rangement','coffret','caisse','etui','étui']],
+];
+
+function vitrineAnalyse(prompt) {
+  const brut = String(prompt || '').toLowerCase();
+  // Les douilles portent un nombre (E27, E14, GU10) qui n'est PAS une cote :
+  // sans ce retrait, « lampe E27 » donnait un diametre de 27 mm.
+  const douille = (brut.match(/\b(e27|e14|gu10)\b/) || [])[0];
+  const t = brut.replace(/\b(e27|e14|gu10)\b/g, ' ');
+
+  // On SCORE au lieu de retenir la premiere correspondance : « lampe
+  // suspendue » contient deux mots de familles differentes.
+  let type = null, meilleur = 0;
+  VITRINE_TYPES.forEach(([id, mots]) => {
+    const n = mots.reduce((a, m) => a + (t.includes(m) ? 1 : 0), 0);
+    if (n > meilleur) { meilleur = n; type = id; }
+  });
+  if (!type) return null;
+
+  /* COTES. Deux lectures, dans cet ordre :
+   *  1. NOMMEE : « hauteur 240 », « diametre 160 » — la phrase dit elle-meme
+   *     a quoi sert le nombre, on la croit.
+   *  2. IMPLICITE : sinon on devine, et la devinette depend de l'objet.
+   *     « table ronde 120 cm » designe un DIAMETRE, pas une hauteur : une
+   *     table de 1,20 m de haut n'existe pas. Le mobilier a une hauteur
+   *     d'usage stable (une table se tient vers 75 cm) alors que sa largeur
+   *     varie ; pour un vase ou un abat-jour c'est l'inverse. */
+  const enMm = (v, u) => { v = parseFloat(String(v).replace(',', '.'));
+    if (u === 'cm') v *= 10; else if (u && u.trim() === 'm') v *= 1000; return Math.round(v); };
+  const nommee = (mots) => {
+    const m = t.match(new RegExp('(?:' + mots + ')\\D{0,12}?(\\d+(?:[.,]\\d+)?)\\s*(mm|cm|m\\b)?', 'i'));
+    return m ? enMm(m[1], m[2]) : null;
+  };
+  let haut = nommee('hauteur|haut de|haute de|de haut');
+  let diam = nommee('diametre|diamètre|diam|largeur|large de|de large|rond de');
+
+  const libres = [];
+  const re = /(\d+(?:[.,]\d+)?)\s*(mm|cm|m\b)?/g;
+  let m;
+  while ((m = re.exec(t)) !== null) {
+    const v = enMm(m[1], m[2]);
+    if (v >= 20 && v <= 3000 && v !== haut && v !== diam) libres.push(v);
+  }
+  libres.sort((a, b) => b - a);
+
+  const MOBILIER = ['table', 'chair', 'shelf', 'vehicle_4x4'];
+  if (MOBILIER.includes(type)) {
+    // la plus grande cote decrit l'encombrement, pas la hauteur
+    if (diam == null && libres.length) diam = libres.shift();
+    if (haut == null && libres.length) haut = libres.shift();
+  } else {
+    if (haut == null && libres.length) haut = libres.shift();
+    if (diam == null && libres.length) diam = libres.shift();
+  }
+
+  const params = {};
+  if (haut != null) params.height = haut;
+  // Le nom du diametre change selon la forme : un vase parle de maxDia, un
+  // abat-jour de topDia et bottomDia. Renseigner le mauvais champ ferait
+  // perdre la cote demandee, le builder gardant sa valeur par defaut.
+  if (diam != null) {
+    if (type === 'vase' || type === 'phi_vase') { params.maxDia = diam; params.baseDia = Math.round(diam * 0.66); }
+    else if (type.startsWith('shade') || type === 'penrose_shade' || type === 'phyllotaxis_shade') {
+      params.topDia = diam; params.bottomDia = Math.round(diam * 0.6);
+    } else { params.dia = diam; }
+  }
+  if (douille) params.socket = douille.toUpperCase();
+  return { type, params };
+}
+
+
+// ── AUTH ──────────────────────────────────────────────
+function _ah() {
+  const t = window.__GD_TOKEN || sessionStorage.getItem('gd_token') || '';
+  return t ? { 'Authorization': `Bearer ${t}` } : {};
+}
+
+// ── STATE ─────────────────────────────────────────────
+let scene, renderer;
+const cams = {};
+let meshGroup = null;
+let currentSpec = null;
+let blenderOk = false;
+const FRUSTUM = 180;
+let viewMode = 'plan';
+let perspCam = null;
+let orbitCtrl = null;
+const vps = {
+  front: { zoom: 1, px: 0, py: 0 },
+  side:  { zoom: 1, px: 0, py: 0 },
+  top:   { zoom: 1, px: 0, py: 0 },
+  back:  { zoom: 1, px: 0, py: 0 },
+};
+
+// ── DISPLAY MODE ──────────────────────────────────────
+let displayMode = 'shaded';
+let edgeLines = null;
+
+function setDisplayMode(mode) {
+  displayMode = mode;
+  document.querySelectorAll('[data-mode]').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === mode)
+  );
+  applyDisplayMode();
+}
+
+function applyDisplayMode() {
+  if (!meshGroup) return;
+  if (edgeLines) { meshGroup.remove(edgeLines); edgeLines.geometry.dispose(); edgeLines = null; }
+  meshGroup.traverse(o => {
+    if (!o.isMesh) return;
+    o.material.wireframe = (displayMode === 'wireframe');
+  });
+  if (displayMode === 'edges') {
+    meshGroup.traverse(o => {
+      if (!o.isMesh) return;
+      const eg = new THREE.EdgesGeometry(o.geometry, 20);
+      edgeLines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x222222 }));
+      meshGroup.add(edgeLines);
+    });
+  }
+}
+
+// ── TRANSFORM TOOL ────────────────────────────────────
+let activeTfTool = null;
+
+function openTransformPanel(tool) {
+  activeTfTool = tool;
+  const labels = { move: 'Déplacer', rotate: 'Rotation', scale: 'Échelle' };
+  document.getElementById('fpt-title').textContent = labels[tool];
+  const xl = document.getElementById('fpt-xl');
+  const yl = document.getElementById('fpt-yl');
+  const zl = document.getElementById('fpt-zl');
+  if (tool === 'move') {
+    xl.textContent = 'X (mm)'; yl.textContent = 'Y (mm)'; zl.textContent = 'Z (mm)';
+    if (meshGroup) {
+      document.getElementById('fpt-x').value = meshGroup.position.x.toFixed(1);
+      document.getElementById('fpt-y').value = meshGroup.position.y.toFixed(1);
+      document.getElementById('fpt-z').value = meshGroup.position.z.toFixed(1);
+    } else { document.getElementById('fpt-x').value = 0; document.getElementById('fpt-y').value = 0; document.getElementById('fpt-z').value = 0; }
+  } else if (tool === 'rotate') {
+    xl.textContent = 'X (°)'; yl.textContent = 'Y (°)'; zl.textContent = 'Z (°)';
+    if (meshGroup) {
+      document.getElementById('fpt-x').value = THREE.MathUtils.radToDeg(meshGroup.rotation.x).toFixed(1);
+      document.getElementById('fpt-y').value = THREE.MathUtils.radToDeg(meshGroup.rotation.y).toFixed(1);
+      document.getElementById('fpt-z').value = THREE.MathUtils.radToDeg(meshGroup.rotation.z).toFixed(1);
+    } else { document.getElementById('fpt-x').value = 0; document.getElementById('fpt-y').value = 0; document.getElementById('fpt-z').value = 0; }
+  } else if (tool === 'scale') {
+    xl.textContent = 'X'; yl.textContent = 'Y'; zl.textContent = 'Z';
+    if (meshGroup) {
+      document.getElementById('fpt-x').value = meshGroup.scale.x.toFixed(2);
+      document.getElementById('fpt-y').value = meshGroup.scale.y.toFixed(2);
+      document.getElementById('fpt-z').value = meshGroup.scale.z.toFixed(2);
+    } else { document.getElementById('fpt-x').value = 1; document.getElementById('fpt-y').value = 1; document.getElementById('fpt-z').value = 1; }
+  }
+  document.getElementById('fp-transform').style.display = 'block';
+  document.querySelectorAll('[data-tool]').forEach(b =>
+    b.classList.toggle('active', b.dataset.tool === tool)
+  );
+}
+
+window.applyTransform = function() {
+  if (!meshGroup) return;
+  const x = parseFloat(document.getElementById('fpt-x').value) || 0;
+  const y = parseFloat(document.getElementById('fpt-y').value) || 0;
+  const z = parseFloat(document.getElementById('fpt-z').value) || 0;
+  if (activeTfTool === 'move')   meshGroup.position.set(x, y, z);
+  if (activeTfTool === 'rotate') meshGroup.rotation.set(THREE.MathUtils.degToRad(x), THREE.MathUtils.degToRad(y), THREE.MathUtils.degToRad(z));
+  if (activeTfTool === 'scale')  meshGroup.scale.set(x||1, y||1, z||1);
+};
+
+window.resetTransform = function() {
+  if (!meshGroup) return;
+  if (activeTfTool === 'move')   meshGroup.position.set(0,0,0);
+  if (activeTfTool === 'rotate') meshGroup.rotation.set(0,0,0);
+  if (activeTfTool === 'scale')  meshGroup.scale.set(1,1,1);
+  openTransformPanel(activeTfTool);
+};
+
+window.closeTransform = function() {
+  activeTfTool = null;
+  document.getElementById('fp-transform').style.display = 'none';
+  document.querySelectorAll('[data-tool]').forEach(b => b.classList.remove('active'));
+};
+
+// ── COPY ──────────────────────────────────────────────
+function copyMesh() {
+  if (!meshGroup) { showToast('Aucun objet à copier'); return; }
+  const cl = meshGroup.clone(true);
+  cl.position.x += 30;
+  scene.add(cl);
+  addMsg('system', 'Copie créée (+30 mm X)');
+}
+
+// ── MIRROR ────────────────────────────────────────────
+function mirrorMesh() {
+  if (!meshGroup) { showToast('Aucun objet'); return; }
+  meshGroup.scale.x *= -1;
+  addMsg('system', 'Miroir axe X appliqué');
+}
+
+// ── MESURER ───────────────────────────────────────────
+let measureHelper = null;
+let measureOn = false;
+
+function toggleMeasure() {
+  measureOn = !measureOn;
+  document.querySelector('[data-tool="measure"]')?.classList.toggle('active', measureOn);
+  if (!measureOn) {
+    if (measureHelper) { scene.remove(measureHelper); measureHelper = null; }
+    document.getElementById('fp-measure').style.display = 'none';
+    return;
+  }
+  if (!meshGroup) { showToast('Aucun objet'); measureOn = false; document.querySelector('[data-tool="measure"]')?.classList.remove('active'); return; }
+  refreshMeasure();
+  document.getElementById('fp-measure').style.display = 'block';
+}
+
+function refreshMeasure() {
+  if (!meshGroup || !measureOn) return;
+  const box3 = new THREE.Box3().setFromObject(meshGroup);
+  const sz = box3.getSize(new THREE.Vector3());
+  if (measureHelper) scene.remove(measureHelper);
+  measureHelper = new THREE.Box3Helper(box3, 0x0055ff);
+  scene.add(measureHelper);
+  document.getElementById('measure-dims').innerHTML =
+    `L&nbsp;<b>${sz.x.toFixed(1)}</b> mm<br>H&nbsp;<b>${sz.y.toFixed(1)}</b> mm<br>P&nbsp;<b>${sz.z.toFixed(1)}</b> mm`;
+}
+
+// ── COUPE ─────────────────────────────────────────────
+let clipPlane = null;
+let clipHelper = null;
+let sectionOn = false;
+
+function toggleSection() {
+  sectionOn = !sectionOn;
+  document.querySelector('[data-tool="section"]')?.classList.toggle('active', sectionOn);
+  if (!sectionOn) {
+    renderer.localClippingEnabled = false;
+    if (clipHelper) { scene.remove(clipHelper); clipHelper = null; }
+    if (meshGroup) meshGroup.traverse(o => { if (o.isMesh) o.material.clippingPlanes = []; });
+    document.getElementById('fp-section').style.display = 'none';
+    return;
+  }
+  clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+  renderer.localClippingEnabled = true;
+  clipHelper = new THREE.PlaneHelper(clipPlane, 200, 0xff6600);
+  scene.add(clipHelper);
+  if (meshGroup) meshGroup.traverse(o => { if (o.isMesh) o.material.clippingPlanes = [clipPlane]; });
+  document.getElementById('sec-slider').value = 0;
+  document.getElementById('sec-val').textContent = '0mm';
+  document.getElementById('fp-section').style.display = 'block';
+}
+
+window.updateSection = function(v) { if (clipPlane) clipPlane.constant = parseFloat(v); };
+
+// ── TOAST ─────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(t._to);
+  t._to = setTimeout(() => t.style.opacity = '0', 2200);
+}
+
+// ── HÉLICOÏDE ─────────────────────────────────────────
+function openHelico() {
+  document.getElementById('fp-helico').style.display = 'block';
+  document.querySelector('[data-tool="helico"]')?.classList.add('active');
+}
+window.applyHelico = function() {
+  const R = parseFloat(document.getElementById('hel-R').value) || 30;
+  const r = parseFloat(document.getElementById('hel-r').value) || 4;
+  const T = parseFloat(document.getElementById('hel-T').value) || 5;
+  const H = parseFloat(document.getElementById('hel-H').value) || 90;
+  closePanel('fp-helico');
+  loadShape('spring', { coilRadius: R, wireRadius: r, turns: T, height: H });
+  addMsg('system', `Hélicoïde R:${R} r:${r} ${T} spires H:${H}`);
+};
+
+// ── RÉSEAU RECTANGULAIRE ──────────────────────────────
+function openResRect() {
+  if (!meshGroup) { showToast('Aucun objet'); return; }
+  document.getElementById('fp-resrect').style.display = 'block';
+  document.querySelector('[data-tool="resrect"]')?.classList.add('active');
+}
+window.applyResRect = function() {
+  if (!meshGroup) return;
+  const cols = Math.max(1, parseInt(document.getElementById('rr-cols').value) || 3);
+  const rows = Math.max(1, parseInt(document.getElementById('rr-rows').value) || 2);
+  const espX = parseFloat(document.getElementById('rr-ex').value) || 60;
+  const espZ = parseFloat(document.getElementById('rr-ez').value) || 60;
+  closePanel('fp-resrect');
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      if (c === 0 && r === 0) continue;
+      const cl = meshGroup.clone(true);
+      cl.position.x = meshGroup.position.x + c * espX;
+      cl.position.z = meshGroup.position.z + r * espZ;
+      scene.add(cl);
+    }
+  }
+  addMsg('system', `Réseau ${cols}×${rows} — esp X:${espX} Z:${espZ}`);
+};
+
+// ── RÉSEAU CIRCULAIRE ─────────────────────────────────
+function openResCirc() {
+  if (!meshGroup) { showToast('Aucun objet'); return; }
+  document.getElementById('fp-rescirc').style.display = 'block';
+  document.querySelector('[data-tool="rescirc"]')?.classList.add('active');
+}
+window.applyResCirc = function() {
+  if (!meshGroup) return;
+  const n = Math.max(2, parseInt(document.getElementById('rc-n').value) || 6);
+  const R = parseFloat(document.getElementById('rc-r').value) || 80;
+  closePanel('fp-rescirc');
+  const origX = meshGroup.position.x;
+  const origZ = meshGroup.position.z;
+  meshGroup.position.x = origX + Math.sin(0) * R;
+  meshGroup.position.z = origZ + Math.cos(0) * R;
+  for (let i = 1; i < n; i++) {
+    const angle = (2 * Math.PI * i) / n;
+    const cl = meshGroup.clone(true);
+    cl.position.x = origX + Math.sin(angle) * R;
+    cl.position.z = origZ + Math.cos(angle) * R;
+    scene.add(cl);
+  }
+  addMsg('system', `Réseau circulaire ${n} copies — rayon:${R}`);
+};
+
+// ── DÉCALAGE (vertex offset) ──────────────────────────
+let _decOrig = null;
+
+function openDecalage() {
+  if (!meshGroup) { showToast('Aucun objet'); return; }
+  // Save original vertex positions
+  meshGroup.traverse(o => {
+    if (!o.isMesh) return;
+    o.geometry.computeVertexNormals();
+    _decOrig = new Float32Array(o.geometry.attributes.position.array);
+  });
+  document.getElementById('dec-slider').value = 0;
+  document.getElementById('dec-val').textContent = '0mm';
+  document.getElementById('fp-decalage').style.display = 'block';
+  document.querySelector('[data-tool="decalage"]')?.classList.add('active');
+}
+
+window.previewDecalage = function(val) {
+  if (!meshGroup || !_decOrig) return;
+  const dist = parseFloat(val) || 0;
+  meshGroup.traverse(o => {
+    if (!o.isMesh) return;
+    const pos = o.geometry.attributes.position;
+    // Restore original first
+    pos.array.set(_decOrig);
+    pos.needsUpdate = true;
+    o.geometry.computeVertexNormals();
+    const nor = o.geometry.attributes.normal;
+    for (let i = 0; i < pos.count; i++) {
+      pos.setXYZ(i,
+        _decOrig[i*3]   + nor.getX(i) * dist,
+        _decOrig[i*3+1] + nor.getY(i) * dist,
+        _decOrig[i*3+2] + nor.getZ(i) * dist
+      );
+    }
+    pos.needsUpdate = true;
+    o.geometry.computeVertexNormals();
+    o.geometry.computeBoundingBox();
+    // Rebuild edge overlay if active
+    if (displayMode === 'edges' && edgeLines) {
+      meshGroup.remove(edgeLines); edgeLines.geometry.dispose(); edgeLines = null;
+      const eg = new THREE.EdgesGeometry(o.geometry, 20);
+      edgeLines = new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: 0x222222 }));
+      meshGroup.add(edgeLines);
+    }
+  });
+};
+
+window.commitDecalage = function() {
+  _decOrig = null;
+  closePanel('fp-decalage');
+  addMsg('system', `Décalage appliqué`);
+};
+
+window.cancelDecalage = function() {
+  // Restore originals
+  if (_decOrig && meshGroup) {
+    meshGroup.traverse(o => {
+      if (!o.isMesh) return;
+      o.geometry.attributes.position.array.set(_decOrig);
+      o.geometry.attributes.position.needsUpdate = true;
+      o.geometry.computeVertexNormals();
+    });
+  }
+  _decOrig = null;
+  closePanel('fp-decalage');
+};
+
+// ── CLOSE PANEL helper ────────────────────────────────
+window.closePanel = function(id) {
+  document.getElementById(id).style.display = 'none';
+  const toolMap = { 'fp-helico':'helico', 'fp-resrect':'resrect', 'fp-rescirc':'rescirc', 'fp-decalage':'decalage' };
+  const tool = toolMap[id];
+  if (tool) document.querySelector(`[data-tool="${tool}"]`)?.classList.remove('active');
+};
+
+// ── TOOLBAR EVENT DELEGATION ──────────────────────────
+const STUBS = new Set(['balayage','gravure','chanfrein','combiner','scission','direct','supprface',
+  'projeter','cote','ajuster','prolonger']);
+
+// ── SKETCH ────────────────────────────────────────────
+let sketchTool = null;      // 'ligne' | 'cercle' | 'rect' | 'point' | 'arc' | null
+let sketchStart = null;     // {x,y,z} world
+let sketchMid = null;       // for arc: intermediate point
+let sketchPreview = null;   // THREE.Line | THREE.Points preview object
+const sketchGroup = new THREE.Group();
+
+function sketchScreenToWorld(canvas, cx, cy) {
+  const r = canvas.getBoundingClientRect();
+  const q = quadAt(canvas, cx, cy);
+  const s = vps[q];
+  const halfW = canvas.clientWidth / 2;
+  const halfH = canvas.clientHeight / 2;
+  const px2u  = (FRUSTUM * 2) / (halfW * s.zoom);
+  let qCx, qCy;
+  if (q === 'front') { qCx = halfW * 0.5; qCy = halfH * 0.5; }
+  if (q === 'side')  { qCx = halfW * 1.5; qCy = halfH * 0.5; }
+  if (q === 'top')   { qCx = halfW * 0.5; qCy = halfH * 1.5; }
+  if (q === 'back')  { qCx = halfW * 1.5; qCy = halfH * 1.5; }
+  const dx = (cx - r.left) - qCx;
+  const dy = (cy - r.top)  - qCy;
+  const wu = s.px + dx * px2u;
+  const wv = s.py - dy * px2u;
+  if (q === 'front') return { x: wu,  y: wv,  z: 0,   q };
+  if (q === 'side')  return { x: 0,   y: wv,  z: -wu, q };
+  if (q === 'top')   return { x: wu,  y: 0,   z: -wv, q };
+  if (q === 'back')  return { x: -wu, y: wv,  z: 0,   q };
+  return { x: wu, y: wv, z: 0, q };
+}
+
+const SKETCH_MAT = new THREE.LineBasicMaterial({ color: 0x0055ff, linewidth: 2 });
+const SKETCH_PREV_MAT = new THREE.LineBasicMaterial({ color: 0x0099ff, linewidth: 1 });
+const SKETCH_PT_MAT = new THREE.PointsMaterial({ color: 0x0055ff, size: 6 });
+
+function sketchMakeLine(a, b) {
+  const geo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(a.x, a.y, a.z),
+    new THREE.Vector3(b.x, b.y, b.z),
+  ]);
+  return new THREE.Line(geo, SKETCH_MAT.clone());
+}
+
+function sketchMakeCircle(center, edge) {
+  const r = Math.sqrt((edge.x-center.x)**2 + (edge.y-center.y)**2 + (edge.z-center.z)**2);
+  const pts = [];
+  for (let i = 0; i <= 64; i++) {
+    const a = (i / 64) * Math.PI * 2;
+    if (center.q === 'top')
+      pts.push(new THREE.Vector3(center.x + r*Math.cos(a), 0, center.z + r*Math.sin(a)));
+    else
+      pts.push(new THREE.Vector3(center.x + r*Math.cos(a), center.y + r*Math.sin(a), center.z));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  return new THREE.Line(geo, SKETCH_MAT.clone());
+}
+
+function sketchMakeRect(a, b) {
+  const pts = [
+    new THREE.Vector3(a.x, a.y, a.z),
+    new THREE.Vector3(b.x, a.y, a.z),
+    new THREE.Vector3(b.x, b.y, b.z),
+    new THREE.Vector3(a.x, b.y, a.z),
+    new THREE.Vector3(a.x, a.y, a.z),
+  ];
+  const geo = new THREE.BufferGeometry().setFromPoints(pts);
+  return new THREE.Line(geo, SKETCH_MAT.clone());
+}
+
+function activateSketchTool(name) {
+  // toggle off if same tool
+  if (sketchTool === name) { exitSketchMode(); return; }
+  exitSketchMode();
+  sketchTool = name;
+  document.querySelector(`[data-tool="${name}"]`)?.classList.add('active');
+  if (!scene.children.includes(sketchGroup)) scene.add(sketchGroup);
+  document.querySelector('canvas').style.cursor = 'crosshair';
+  showToast(`Mode ${name} — cliquez pour commencer`);
+}
+
+function exitSketchMode() {
+  sketchTool = null; sketchStart = null; sketchMid = null;
+  if (sketchPreview) { scene.remove(sketchPreview); sketchPreview = null; }
+  document.querySelectorAll('[data-tool]').forEach(b => {
+    if (['ligne','cercle','rect','point','arc'].includes(b.dataset.tool)) b.classList.remove('active');
+  });
+  const cv = document.querySelector('canvas');
+  if (cv) cv.style.cursor = '';
+}
+
+function sketchHandleClick(canvas, cx, cy) {
+  const pt = sketchScreenToWorld(canvas, cx, cy);
+  if (sketchTool === 'point') {
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(pt.x, pt.y, pt.z)]);
+    sketchGroup.add(new THREE.Points(geo, SKETCH_PT_MAT.clone()));
+    return;
+  }
+  if (sketchTool === 'arc') {
+    if (!sketchStart) { sketchStart = pt; return; }
+    if (!sketchMid)   { sketchMid = pt; return; }
+    const curve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(sketchStart.x, sketchStart.y, sketchStart.z),
+      new THREE.Vector3(sketchMid.x, sketchMid.y, sketchMid.z),
+      new THREE.Vector3(pt.x, pt.y, pt.z)
+    );
+    const arcGeo = new THREE.BufferGeometry().setFromPoints(curve.getPoints(48));
+    sketchGroup.add(new THREE.Line(arcGeo, SKETCH_MAT.clone()));
+    sketchStart = null; sketchMid = null;
+    if (sketchPreview) { scene.remove(sketchPreview); sketchPreview = null; }
+    return;
+  }
+  if (!sketchStart) { sketchStart = pt; return; }
+  let obj = null;
+  if (sketchTool === 'ligne')  obj = sketchMakeLine(sketchStart, pt);
+  if (sketchTool === 'cercle') obj = sketchMakeCircle(sketchStart, pt);
+  if (sketchTool === 'rect')   obj = sketchMakeRect(sketchStart, pt);
+  if (obj) sketchGroup.add(obj);
+  if (sketchPreview) { scene.remove(sketchPreview); sketchPreview = null; }
+  sketchStart = null;
+}
+
+function sketchHandleMove(canvas, cx, cy) {
+  if (!sketchStart || !sketchTool) return;
+  const pt = sketchScreenToWorld(canvas, cx, cy);
+  if (sketchPreview) scene.remove(sketchPreview);
+  if (sketchTool === 'ligne')  sketchPreview = sketchMakeLine(sketchStart, pt);
+  if (sketchTool === 'cercle') sketchPreview = sketchMakeCircle(sketchStart, pt);
+  if (sketchTool === 'rect')   sketchPreview = sketchMakeRect(sketchStart, pt);
+  if (sketchTool === 'arc' && sketchMid) {
+    const curve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(sketchStart.x, sketchStart.y, sketchStart.z),
+      new THREE.Vector3(sketchMid.x, sketchMid.y, sketchMid.z),
+      new THREE.Vector3(pt.x, pt.y, pt.z)
+    );
+    const g = new THREE.BufferGeometry().setFromPoints(curve.getPoints(32));
+    sketchPreview = new THREE.Line(g, SKETCH_PREV_MAT.clone());
+  } else if (sketchTool === 'arc' && !sketchMid) {
+    sketchPreview = sketchMakeLine(sketchStart, pt);
+  }
+  if (sketchPreview) {
+    if (!sketchPreview.material || sketchPreview.material === SKETCH_MAT) sketchPreview.material = SKETCH_PREV_MAT.clone();
+    scene.add(sketchPreview);
+  }
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && sketchTool) exitSketchMode(); });
+
+// ── HELPER: replace current meshGroup ─────────────────
+function replaceMesh(mesh) {
+  if (meshGroup) {
+    meshGroup.traverse(o => { if(o.isMesh){ o.geometry.dispose(); o.material.dispose(); }});
+    scene.remove(meshGroup);
+  }
+  meshGroup = new THREE.Group();
+  meshGroup.add(mesh);
+  scene.add(meshGroup);
+  _decOrig = null; edgeLines = null;
+  applyDisplayMode();
+}
+
+function stdMat() {
+  return new THREE.MeshPhysicalMaterial({ color: 0x8a8a8a, roughness: 0.45, metalness: 0.05, clearcoat: 0.2, side: THREE.DoubleSide });
+}
+
+// ── EXTRUSION ─────────────────────────────────────────
+function openExtrusion() { document.getElementById('fp-extrusion').style.display = 'block'; }
+
+window.applyExtrusion = function() {
+  const depth = parseFloat(document.getElementById('ext-h').value) || 30;
+  const bevel = document.getElementById('ext-bevel').checked;
+  let shape = null;
+
+  sketchGroup.children.forEach(child => {
+    if (shape || !child.isLine) return;
+    const pos = child.geometry.attributes.position;
+    if (pos.count >= 60) { // circle (65 pts)
+      let sx = 0, sy = 0;
+      for (let i = 0; i < pos.count - 1; i++) { sx += pos.getX(i); sy += pos.getY(i); }
+      const cx = sx / (pos.count - 1), cy = sy / (pos.count - 1);
+      const r = Math.sqrt((pos.getX(0)-cx)**2 + (pos.getY(0)-cy)**2);
+      shape = new THREE.Shape(); shape.absarc(cx, cy, r, 0, Math.PI*2, false);
+    } else if (pos.count === 5) { // rectangle (5 pts)
+      shape = new THREE.Shape([
+        new THREE.Vector2(pos.getX(0), pos.getY(0)),
+        new THREE.Vector2(pos.getX(1), pos.getY(1)),
+        new THREE.Vector2(pos.getX(2), pos.getY(2)),
+        new THREE.Vector2(pos.getX(3), pos.getY(3)),
+      ]);
+    }
+  });
+
+  if (!shape) { showToast('Dessinez un Cercle ou Rectangle (outil Esquisse) puis extrudez'); closePanel('fp-extrusion'); return; }
+
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth, bevelEnabled: bevel, bevelSize: bevel ? 3 : 0, bevelThickness: bevel ? 3 : 0, bevelSegments: bevel ? 3 : 0,
+  });
+  geo.computeVertexNormals();
+  replaceMesh(new THREE.Mesh(geo, stdMat()));
+  closePanel('fp-extrusion');
+};
+
+// ── RÉVOLUTION ────────────────────────────────────────
+function openRevolution() { document.getElementById('fp-revolution').style.display = 'block'; }
+
+window.applyRevolution = function() {
+  const angle = parseFloat(document.getElementById('rev-angle').value) || 360;
+  const segs  = parseInt(document.getElementById('rev-segs').value) || 48;
+
+  const pts = [];
+  sketchGroup.children.forEach(child => {
+    if (!child.isLine) return;
+    const pos = child.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(pos.getZ(i)) < 1) pts.push(new THREE.Vector2(Math.abs(pos.getX(i)), pos.getY(i)));
+    }
+  });
+
+  if (pts.length < 2) { showToast('Dessinez un profil (Lignes) dans la vue Face, côté droit'); closePanel('fp-revolution'); return; }
+
+  // deduplicate & sort by Y
+  pts.sort((a, b) => a.y - b.y);
+  const uniq = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    if (Math.abs(pts[i].x - uniq[uniq.length-1].x) > 0.5 || Math.abs(pts[i].y - uniq[uniq.length-1].y) > 0.5) uniq.push(pts[i]);
+  }
+
+  const geo = new THREE.LatheGeometry(uniq, segs, 0, angle * Math.PI / 180);
+  geo.computeVertexNormals();
+  replaceMesh(new THREE.Mesh(geo, stdMat()));
+  closePanel('fp-revolution');
+};
+
+// ── LISSAGE ───────────────────────────────────────────
+let lissageOn = false;
+function applyLissage() {
+  if (!meshGroup) { showToast('Pas de maillage actif'); return; }
+  lissageOn = !lissageOn;
+  meshGroup.traverse(o => {
+    if (!o.isMesh) return;
+    o.material.flatShading = !lissageOn;
+    o.material.needsUpdate = true;
+  });
+  document.querySelector('[data-tool="lissage"]')?.classList.toggle('active', lissageOn);
+  showToast(lissageOn ? 'Lissage activé' : 'Facettes activées');
+}
+
+// ── CONGÉ ─────────────────────────────────────────────
+function openConge() { document.getElementById('fp-conge').style.display = 'block'; }
+
+window.applyConge = function() {
+  const passes = parseInt(document.getElementById('conge-passes').value) || 2;
+  if (!meshGroup) { closePanel('fp-conge'); return; }
+  meshGroup.traverse(o => {
+    if (!o.isMesh || !o.geometry.index) return;
+    const pos = o.geometry.attributes.position;
+    const idx = o.geometry.index.array;
+    for (let p = 0; p < passes; p++) {
+      const sums = new Float32Array(pos.count * 3);
+      const counts = new Int32Array(pos.count);
+      for (let i = 0; i < idx.length; i += 3) {
+        const [a,b,c] = [idx[i], idx[i+1], idx[i+2]];
+        [a,b,c].forEach(v => {
+          [a,b,c].forEach(n => {
+            sums[v*3]   += pos.getX(n); sums[v*3+1] += pos.getY(n); sums[v*3+2] += pos.getZ(n);
+          });
+          counts[v] += 3;
+        });
+      }
+      for (let i = 0; i < pos.count; i++) {
+        if (!counts[i]) continue;
+        pos.setXYZ(i, sums[i*3]/counts[i], sums[i*3+1]/counts[i], sums[i*3+2]/counts[i]);
+      }
+    }
+    pos.needsUpdate = true;
+    o.geometry.computeVertexNormals();
+  });
+  _decOrig = null;
+  closePanel('fp-conge');
+  showToast(`Congé — ${passes} passe(s) de lissage`);
+};
+
+// ── COQUE ─────────────────────────────────────────────
+function openCoque() { document.getElementById('fp-coque').style.display = 'block'; }
+
+window.applyCoque = function() {
+  const thickness = parseFloat(document.getElementById('coque-t').value) || 3;
+  if (!meshGroup) { closePanel('fp-coque'); return; }
+  const box = new THREE.Box3().setFromObject(meshGroup);
+  const size = box.getSize(new THREE.Vector3());
+  const maxD = Math.max(size.x, size.y, size.z) || 1;
+  const sf = Math.max(0.05, 1 - (thickness * 2 / maxD));
+
+  meshGroup.traverse(o => {
+    if (!o.isMesh) return;
+    const innerGeo = o.geometry.clone();
+    const pos = innerGeo.attributes.position;
+    for (let i = 0; i < pos.count; i++) pos.setXYZ(i, pos.getX(i)*sf, pos.getY(i)*sf, pos.getZ(i)*sf);
+    pos.needsUpdate = true;
+    if (innerGeo.index) {
+      const arr = innerGeo.index.array;
+      for (let i = 0; i < arr.length; i += 3) { const t = arr[i+1]; arr[i+1] = arr[i+2]; arr[i+2] = t; }
+      innerGeo.index.needsUpdate = true;
+    }
+    innerGeo.computeVertexNormals();
+    const innerMat = stdMat(); innerMat.side = THREE.BackSide;
+    meshGroup.add(new THREE.Mesh(innerGeo, innerMat));
+    o.material.side = THREE.DoubleSide; o.material.needsUpdate = true;
+  });
+  closePanel('fp-coque');
+  showToast(`Coque ${thickness}mm — intérieur visible`);
+};
+
+// ── DÉPOUILLE ─────────────────────────────────────────
+function openDepouille() { document.getElementById('fp-depouille').style.display = 'block'; }
+
+window.applyDepouille = function() {
+  const angleDeg = parseFloat(document.getElementById('dep-angle').value) || 5;
+  if (!meshGroup) { closePanel('fp-depouille'); return; }
+  const box = new THREE.Box3().setFromObject(meshGroup);
+  const minY = box.min.y, height = (box.max.y - box.min.y) || 1;
+  const taper = Math.tan(angleDeg * Math.PI / 180);
+  meshGroup.traverse(o => {
+    if (!o.isMesh) return;
+    const pos = o.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const t = (pos.getY(i) - minY) / height;
+      const sf = Math.max(0.01, 1 - t * taper);
+      pos.setX(i, pos.getX(i) * sf); pos.setZ(i, pos.getZ(i) * sf);
+    }
+    pos.needsUpdate = true; o.geometry.computeVertexNormals();
+  });
+  _decOrig = null;
+  closePanel('fp-depouille');
+  showToast(`Dépouille ${angleDeg}° appliquée`);
+};
+
+// ── TEXTE 3D ─────────────────────────────────────────
+let _cachedFont = null;
+function openTexte() { document.getElementById('fp-texte').style.display = 'block'; }
+
+window.applyTexte = function() {
+  const txt  = document.getElementById('txt-val').value || 'GDS';
+  const size = parseFloat(document.getElementById('txt-size').value) || 30;
+  const h    = parseFloat(document.getElementById('txt-h').value) || 8;
+  closePanel('fp-texte');
+  showToast('Chargement police…');
+
+  // VITRINE : la gravure repose sur TextGeometry, FontLoader et la police
+  // helvetiker, absents du vendor local du portail ; la CSP interdit le CDN.
+  // L'outil est donc desactive ici plutot que de faire echouer le module.
+  showToast('Gravure de texte : disponible dans la version complete');
+  return;
+};
+
+document.getElementById('toolbar').addEventListener('click', e => {
+  const btn = e.target.closest('.tool-btn');
+  if (!btn) return;
+  const mode = btn.dataset.mode;
+  const tool = btn.dataset.tool;
+  if (mode) { setDisplayMode(mode); return; }
+  if (!tool) return;
+  if (STUBS.has(tool)) { showToast(`${btn.title || tool} — à venir`); return; }
+  if (['ligne','cercle','rect','point','arc'].includes(tool)) { activateSketchTool(tool); return; }
+  if (tool === 'extrusion') { openExtrusion(); return; }
+  if (tool === 'revolution') { openRevolution(); return; }
+  if (tool === 'lissage')  { applyLissage(); return; }
+  if (tool === 'conge')    { openConge(); return; }
+  if (tool === 'coque')    { openCoque(); return; }
+  if (tool === 'depouille'){ openDepouille(); return; }
+  if (tool === 'texte')    { openTexte(); return; }
+  if (tool === 'copy')    { copyMesh(); return; }
+  if (tool === 'miroir')  { mirrorMesh(); return; }
+  if (tool === 'measure') { toggleMeasure(); return; }
+  if (tool === 'section') { toggleSection(); return; }
+  if (tool === 'helico')  { openHelico(); return; }
+  if (tool === 'resrect') { openResRect(); return; }
+  if (tool === 'rescirc') { openResCirc(); return; }
+  if (tool === 'decalage'){ openDecalage(); return; }
+  // Transform panel toggle
+  if (['move','rotate','scale'].includes(tool)) {
+    if (activeTfTool === tool) { window.closeTransform(); return; }
+    openTransformPanel(tool);
+  }
+});
+
+// ── INIT THREE ────────────────────────────────────────
+function initThree() {
+  const canvas = document.getElementById('main-canvas');
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xfafafa);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const d1 = new THREE.DirectionalLight(0xffffff, 0.9); d1.position.set(1, 2, 1.5); scene.add(d1);
+  const d2 = new THREE.DirectionalLight(0xffffff, 0.25); d2.position.set(-1, -0.5, -1); scene.add(d2);
+  const g = new THREE.GridHelper(400, 20, 0xdedede, 0xdedede); scene.add(g);
+  scene.add(sketchGroup);
+  [[100,0,0,0xffaaaa],[0,100,0,0xaaffaa],[0,0,100,0xaaaaff]].forEach(([x,y,z,c]) => {
+    const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(x,y,z)]);
+    scene.add(new THREE.Line(geo, new THREE.LineBasicMaterial({color:c})));
+  });
+  const mk = () => new THREE.OrthographicCamera(-FRUSTUM, FRUSTUM, FRUSTUM, -FRUSTUM, -3000, 3000);
+  cams.front = mk(); cams.front.position.set(0,0,600);  cams.front.lookAt(0,0,0);
+  cams.side  = mk(); cams.side.position.set(600,0,0);   cams.side.lookAt(0,0,0);
+  cams.top   = mk(); cams.top.position.set(0,600,0);    cams.top.lookAt(0,0,0); cams.top.up.set(0,0,-1);
+  cams.back  = mk(); cams.back.position.set(0,0,-600);  cams.back.lookAt(0,0,0);
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  /* VUE 3D PAR DEFAUT (25/08). Le studio ouvrait sur les quatre vues
+ * orthographiques : sur un telephone en portrait, chaque vue fait quelques
+ * dizaines de pixels et l'objet devient invisible. On bascule en 3D libre au
+ * demarrage — toggleView initialise aussi la camera perspective et les
+ * controles d'orbite, donc on passe par elle plutot que de dupliquer ce code.
+ * Le bouton « ⊞ Plan » reste la pour retrouver les vues cotees. */
+addEventListener('DOMContentLoaded', () => { try { if (viewMode === 'plan') window.toggleView(); } catch(e){} });
+
+window.addEventListener('resize', resize);
+  resize();
+  initInput(canvas);
+  requestAnimationFrame(loop);
+}
+
+function resize() {
+  const vp = document.getElementById('viewports');
+  renderer.setSize(vp.clientWidth, vp.clientHeight);
+}
+
+function updateCam(cam, qw, qh, s) {
+  const a = qw / qh, z = s.zoom;
+  cam.left   = (-FRUSTUM * a / z) + s.px; cam.right  = ( FRUSTUM * a / z) + s.px;
+  cam.top    = ( FRUSTUM / z) + s.py;     cam.bottom = (-FRUSTUM / z) + s.py;
+  cam.updateProjectionMatrix();
+}
+
+function loop() {
+  requestAnimationFrame(loop);
+  const cW = renderer.domElement.clientWidth;
+  const cH = renderer.domElement.clientHeight;
+  if (viewMode === '3d') {
+    if (orbitCtrl) orbitCtrl.update();
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, cW, cH);
+    perspCam.aspect = cW / cH;
+    perspCam.updateProjectionMatrix();
+    renderer.render(scene, perspCam);
+  } else {
+    const hw = Math.floor(cW / 2), hh = Math.floor(cH / 2);
+    renderer.setScissorTest(true);
+    [['front',0,hh,hw,hh],['side',hw,hh,hw,hh],['top',0,0,hw,hh],['back',hw,0,hw,hh]].forEach(([n,...vp]) => {
+      renderer.setViewport(...vp); renderer.setScissor(...vp);
+      updateCam(cams[n], hw, hh, vps[n]);
+      renderer.render(scene, cams[n]);
+    });
+  }
+}
+
+// ── TOGGLE 3D / PLAN ──────────────────────────────────
+window.toggleView = function() {
+  if (viewMode === 'plan') {
+    if (!perspCam) {
+      perspCam = new THREE.PerspectiveCamera(50, 1, 0.1, 10000);
+      perspCam.position.set(150, 150, 150); perspCam.lookAt(0,0,0);
+      orbitCtrl = new OrbitControls(perspCam, renderer.domElement);
+      orbitCtrl.enableDamping = true; orbitCtrl.dampingFactor = 0.08;
+    }
+    if (meshGroup) {
+      const box3 = new THREE.Box3().setFromObject(meshGroup);
+      const sz = box3.getSize(new THREE.Vector3());
+      const center = box3.getCenter(new THREE.Vector3());
+      const d = Math.max(sz.x, sz.y, sz.z, 1) * 1.8;
+      perspCam.position.set(center.x + d, center.y + d*.8, center.z + d);
+      perspCam.lookAt(center); orbitCtrl.target.copy(center); orbitCtrl.update();
+    }
+    document.querySelectorAll('.vdiv, .vp-label').forEach(el => el.style.opacity = '0');
+    document.getElementById('view-toggle').textContent = '⊞ Plan';
+    viewMode = '3d'; if (orbitCtrl) orbitCtrl.enabled = true;
+  } else {
+    document.querySelectorAll('.vdiv, .vp-label').forEach(el => el.style.opacity = '');
+    document.getElementById('view-toggle').textContent = '⬜ 3D libre';
+    viewMode = 'plan'; if (orbitCtrl) orbitCtrl.enabled = false;
+  }
+};
+
+window.orbit3D = function(azimuthDeg, elevationDeg) {
+  if (!perspCam || !meshGroup) return;
+  const box3 = new THREE.Box3().setFromObject(meshGroup);
+  const sz = box3.getSize(new THREE.Vector3());
+  const center = box3.getCenter(new THREE.Vector3());
+  const d = Math.max(sz.x, sz.y, sz.z, 1) * 1.8;
+  const az = azimuthDeg * Math.PI / 180;
+  const el = elevationDeg * Math.PI / 180;
+  perspCam.position.set(
+    center.x + d * Math.cos(el) * Math.sin(az),
+    center.y + d * Math.sin(el),
+    center.z + d * Math.cos(el) * Math.cos(az)
+  );
+  perspCam.lookAt(center);
+  if (orbitCtrl) { orbitCtrl.target.copy(center); orbitCtrl.update(); }
+};
+
+// ── INPUT ─────────────────────────────────────────────
+function quadAt(canvas, cx, cy) {
+  const r = canvas.getBoundingClientRect();
+  const rx = (cx-r.left)/r.width, ry = (cy-r.top)/r.height;
+  if (rx < .5 && ry < .5) return 'front';
+  if (rx >= .5 && ry < .5) return 'side';
+  if (rx < .5 && ry >= .5) return 'top';
+  return 'back';
+}
+
+function initInput(canvas) {
+  canvas.addEventListener('wheel', e => {
+    if (viewMode === '3d') return; e.preventDefault();
+    const s = vps[quadAt(canvas, e.clientX, e.clientY)];
+    s.zoom = Math.max(0.05, Math.min(80, s.zoom * (e.deltaY > 0 ? 0.88 : 1.14)));
+  }, { passive: false });
+  let drag = null;
+  canvas.addEventListener('mousedown', e => {
+    if (viewMode === '3d') return;
+    if (sketchTool) { sketchHandleClick(canvas, e.clientX, e.clientY); return; }
+    drag = { q: quadAt(canvas, e.clientX, e.clientY), x: e.clientX, y: e.clientY };
+  });
+  window.addEventListener('mousemove', e => {
+    if (viewMode === '3d') return;
+    if (sketchTool) { sketchHandleMove(canvas, e.clientX, e.clientY); return; }
+    if (!drag) return;
+    const s = vps[drag.q];
+    const px2u = (FRUSTUM * 2) / ((canvas.clientWidth / 2) * s.zoom);
+    s.px -= (e.clientX - drag.x) * px2u; s.py += (e.clientY - drag.y) * px2u;
+    drag.x = e.clientX; drag.y = e.clientY;
+  });
+  window.addEventListener('mouseup', () => { drag = null; });
+  canvas.addEventListener('contextmenu', e => {
+    e.preventDefault(); if (viewMode === '3d') return;
+    const q = quadAt(canvas, e.clientX, e.clientY);
+    vps[q] = { zoom: vps[q].zoom, px: 0, py: 0 };
+  });
+}
+
+// ── LOAD SHAPE ────────────────────────────────────────
+function loadShape(type, params) {
+  let raw;
+  try { raw = (type === 'lamp' || type === 'lampe') ? buildLampMesh(params) : buildShape(type, params); } catch(e) { addMsg('system', `Erreur builder : ${e.message}`); return; }
+  if (!raw || !raw.V || !raw.V.length) { addMsg('system', 'Mesh vide.'); return; }
+  currentSpec = { type, params };
+  mountRaw(raw, type);
+}
+
+/* Pièce importée (STL posé, hauteur sur Z) : affichée en Y haut comme les générateurs. */
+function loadTris(tris, nom) {
+  const raw = FAB.trisVersMesh(FAB.zVersY(tris));
+  raw.meta.nom = nom;
+  currentSpec = { type: 'stl', params: {}, nom };
+  mountRaw(raw, nom);
+}
+
+function mountRaw(raw, label) {
+  if (measureHelper) { scene.remove(measureHelper); measureHelper = null; }
+  if (meshGroup) {
+    scene.remove(meshGroup);
+    meshGroup.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+    meshGroup = null; edgeLines = null;
+  }
+  window.currentRaw = raw; window.currentRawNom = label;
+  const geo = new THREE.BufferGeometry();
+  const isFlat = raw.V instanceof Float32Array || raw.V instanceof Float64Array;
+  if (isFlat) {
+    geo.setAttribute('position', new THREE.BufferAttribute(raw.V, 3));
+    geo.setIndex(new THREE.BufferAttribute(
+      raw.tris instanceof Uint32Array ? raw.tris : new Uint32Array(raw.tris.flat ? raw.tris.flat() : raw.tris), 1
+    ));
+  } else {
+    const pos = []; raw.tris.forEach(t => t.forEach(i => pos.push(...raw.V[i])));
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  }
+  geo.computeVertexNormals(); geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  geo.translate(-(bb.min.x+bb.max.x)/2, -(bb.min.y+bb.max.y)/2, -(bb.min.z+bb.max.z)/2);
+
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0x8a8a8a, roughness: 0.45, metalness: 0.05, clearcoat: 0.2, side: THREE.DoubleSide,
+  });
+  if (sectionOn && clipPlane) mat.clippingPlanes = [clipPlane];
+
+  const mesh = new THREE.Mesh(geo, mat);
+  meshGroup = new THREE.Group(); meshGroup.add(mesh); scene.add(meshGroup);
+  applyDisplayMode();
+
+  geo.computeBoundingBox();
+  const sz3 = geo.boundingBox.getSize(new THREE.Vector3());
+  const maxDim = Math.max(sz3.x, sz3.y, sz3.z, 1);
+  const z = (FRUSTUM * 1.6) / maxDim;
+  for (const q of ['front','side','top','back']) vps[q] = { zoom: z, px: 0, py: 0 };
+
+  document.getElementById('btn-push').disabled = !blenderOk;
+  if (measureOn) refreshMeasure();
+  rapportFabricabilite(geo);
+}
+
+// ── OBJ EXPORT ────────────────────────────────────────
+function meshToOBJ() {
+  let s = ''; if (!meshGroup) return s;
+  meshGroup.traverse(o => {
+    if (!o.isMesh) return;
+    const p = o.geometry.attributes.position, wm = o.matrixWorld, tmp = new THREE.Vector3();
+    for (let i = 0; i < p.count; i++) { tmp.fromBufferAttribute(p,i).applyMatrix4(wm); s += `v ${tmp.x.toFixed(4)} ${tmp.y.toFixed(4)} ${tmp.z.toFixed(4)}\n`; }
+    const idx = o.geometry.index;
+    if (idx) { for (let i = 0; i < idx.count; i+=3) s += `f ${idx.getX(i)+1} ${idx.getX(i+1)+1} ${idx.getX(i+2)+1}\n`; }
+    else { for (let i = 0; i < p.count; i+=3) s += `f ${i+1} ${i+2} ${i+3}\n`; }
+  });
+  return s;
+}
+
+// ── BLENDER ───────────────────────────────────────────
+async function updateBlenderStatus() {
+  try { blenderOk = false;   // vitrine : pas de pont Blender (site statique)
+       if (false) await fetch('/api/blender/live/status'); }
+  catch { blenderOk = false; }
+  document.getElementById('blender-dot').className = blenderOk ? 'ok' : 'err';
+  document.getElementById('btn-push').disabled = !blenderOk || !currentSpec;
+}
+window.connectBlender = async () => {
+  document.getElementById('blender-label').textContent = '…';
+  await updateBlenderStatus();
+  document.getElementById('blender-label').textContent = 'BLENDER';
+};
+window.pushToBlender = async () => {
+  if (!currentSpec || !blenderOk) return;
+  const btn = document.getElementById('btn-push'); btn.disabled = true; btn.textContent = '…';
+  try {
+    if (!blenderOk) return;   // vitrine : pas de pont Blender
+    const r = await fetch('/api/blender/live/push', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ obj: meshToOBJ(), name: currentSpec.type }),
+    });
+    const d = await r.json();
+    addMsg('system', d.ok ? '→ Blender : importé' : `→ Blender : ${d.note||'erreur'}`);
+  } catch { addMsg('system', '→ Blender : erreur réseau'); }
+  btn.disabled = !blenderOk; btn.textContent = '→ Blender';
+};
+
+// ── CHAT ──────────────────────────────────────────────
+let msgsEl, emptyEl;
+function initChat() {
+  msgsEl = document.getElementById('messages');
+  emptyEl = document.getElementById('empty');
+  const ta = document.getElementById('prompt');
+  ta.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); window.sendPrompt(); } });
+  ta.addEventListener('input', () => { ta.style.height='auto'; ta.style.height=Math.min(ta.scrollHeight,96)+'px'; });
+}
+// ── DESIGN HEALTH (Ender-3 S1 · PLA · ∅0.4) ──────────
+const _DH_BUILD = { x: 220, y: 220, z: 270 };
+const _DH_MAT   = { density: 1.24, cost_per_g: 0.020, Tg: 60 };
+
+function _dhVolume(geo) {
+  const p = geo.attributes.position, idx = geo.index;
+  if (!p) return 0;
+  let vol = 0;
+  const n = idx ? idx.count : p.count;
+  for (let i = 0; i < n; i += 3) {
+    const ai=idx?idx.getX(i):i, bi=idx?idx.getX(i+1):i+1, ci=idx?idx.getX(i+2):i+2;
+    const ax=p.getX(ai),ay=p.getY(ai),az=p.getZ(ai);
+    const bx=p.getX(bi),by=p.getY(bi),bz=p.getZ(bi);
+    const cx=p.getX(ci),cy=p.getY(ci),cz=p.getZ(ci);
+    vol += ax*(by*cz-bz*cy) + bx*(cy*az-cz*ay) + cx*(ay*bz-az*by);
+  }
+  return Math.abs(vol) / 6;
+}
+
+function _dhOverhangRatio(geo) {
+  const p = geo.attributes.position, idx = geo.index;
+  if (!p) return 0;
+  let over = 0, total = 0;
+  const n = idx ? idx.count : p.count;
+  const step = Math.max(3, Math.floor(n / 900) * 3);
+  for (let i = 0; i < n; i += step) {
+    const ai=idx?idx.getX(i):i, bi=idx?idx.getX(i+1):i+1, ci=idx?idx.getX(i+2):i+2;
+    const ax=p.getX(ai),ay=p.getY(ai),az=p.getZ(ai);
+    const bx=p.getX(bi),by=p.getY(bi),bz=p.getZ(bi);
+    const cx=p.getX(ci),cy=p.getY(ci),cz=p.getZ(ci);
+    const ex=bx-ax,ey=by-ay,ez=bz-az, fx=cx-ax,fy=cy-ay,fz=cz-az;
+    const nx=ey*fz-ez*fy, ny=ez*fx-ex*fz;
+    const len=Math.sqrt(nx*nx+ny*ny+(ex*fy-ey*fx)**2);
+    if (len<1e-9){total++;continue;}
+    if (ny/len < -0.64) over++;
+    total++;
+  }
+  return total > 0 ? over/total : 0;
+}
+
+function _dhSet(key, status, label) {
+  const dot = document.getElementById(`dh-${key}-dot`);
+  const val = document.getElementById(`dh-${key}-val`);
+  if (dot) dot.className = `dh-dot ${status}`;
+  if (val) { val.className = `dh-val ${status}`; val.textContent = label; }
+}
+
+let _rapportCourant = null, _rapportSerie = 0;
+async function rapportFabricabilite(geo) {
+  const el = document.getElementById('design-health');
+  if (!el || !window.currentRaw) return;
+  el.style.display = 'block';
+  const serie = ++_rapportSerie;
+  const raw = window.currentRaw;
+  let tris = FAB.meshVersTris(raw);
+  if (raw.meta && raw.meta.units === 'u10mm') tris = FAB.echelle(tris, 10);   // formes phi / gyroide : 1 unite = 10 mm
+  tris = FAB.yVersZ(tris);   // le studio affiche en Y haut (generateurs comme STL importe) ; l analyse se fait piece posee, Z haut
+  const machine = document.getElementById('dh-machine')?.value || 'bambu_a1';
+  const matiere = document.getElementById('dh-matiere')?.value || 'PLA';
+  const buse = parseFloat(document.getElementById('dh-buse')?.value || '0.4');
+  const lbl = document.querySelector('#design-health .dh-machine-label'); if (lbl) lbl.textContent = `${FAB.MACHINES[machine].nom} · ${matiere} · ∅${buse}`;
+  _dhSet('geo', 'na', '…'); _dhSet('print', 'na', 'analyse…');
+  const liste = document.getElementById('dh-constats'); if (liste) liste.textContent = '';
+  try {
+    const r = await FAB.analyserTris(tris, { machine, matiere, buse, nom: window.currentRawNom || currentSpec?.type || 'piece', origine: currentSpec?.type === 'stl' ? 'fichier' : 'studio' },
+      p => { if (serie === _rapportSerie) _dhSet('print', 'na', `analyse ${Math.round(p * 100)} %`); });
+    if (serie !== _rapportSerie) return;
+    _rapportCourant = r; window.dernierRapport = r;
+    const m = r.mesures;
+    _dhSet('geo', m.sante.watertight ? 'pass' : 'fail', m.sante.watertight ? `${tris.length} △ · fermé` : `${m.sante.open} arête(s) ouverte(s)`);
+    const st = { PASS: 'pass', WARN: 'warn', FAIL: 'fail' }[r.verdict] || 'na';
+    const hard = r.constats.filter(c => c.severity === 'HARD').length, soft = r.constats.filter(c => c.severity === 'SOFT').length;
+    _dhSet('print', st, r.verdict + (r.constats.length ? ` · ${hard} bloquant${hard > 1 ? 's' : ''}, ${soft} avert.` : ' · aucun constat'));
+    const cv = document.getElementById('dh-cost-val'); if (cv) cv.textContent = `${m.estimation.weightG} g · ${m.estimation.costEur.toFixed(2)} €`;
+    const tv = document.getElementById('dh-time-val'); if (tv) tv.textContent = m.estimation.timeMin < 60 ? `${m.estimation.timeMin} min` : `${Math.floor(m.estimation.timeMin / 60)}h${String(Math.round(m.estimation.timeMin % 60)).padStart(2, '0')}`;
+    if (liste) {
+      for (const c of r.constats) {
+        const li = document.createElement('div'); li.className = `dh-constat ${c.severity}`;
+        const t = document.createElement('span'); t.className = 'dh-cid'; t.textContent = c.severity + ' ' + c.id;
+        li.append(t, document.createTextNode(' ' + c.msg));
+        if (c.suggestion) { const sg = document.createElement('span'); sg.className = 'dh-csugg'; sg.textContent = '→ ' + c.suggestion; li.appendChild(sg); }
+        liste.appendChild(li);
+      }
+      const o = m.meilleure_orientation;
+      const info = document.createElement('div'); info.className = 'dh-constat INFO';
+      info.textContent = `surplomb ${m.surplomb_pct} %` + (o ? ` · meilleure pose : ${o.nom} (${o.surplomb_pct} %)` : '') + (m.parois_critiques_pct != null ? ` · parois sous le cordon : ${m.parois_critiques_pct} %` : '') + ` · ${(m.volume_mm3 / 1000).toFixed(1)} cm³`;
+      liste.appendChild(info);
+    }
+  } catch (e) {
+    if (serie === _rapportSerie) _dhSet('print', 'fail', 'analyse interrompue : ' + (e.message || e));
+  }
+}
+window.telechargerRapport = () => {
+  if (!_rapportCourant) { showToast('Aucun rapport : génère ou importe une pièce.'); return; }
+  const blob = new Blob([JSON.stringify(_rapportCourant, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'rapport-fabricabilite.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+window.relancerRapport = () => { if (meshGroup) rapportFabricabilite(); };
+window.importerSTL = async (input) => {
+  const f = input.files && input.files[0]; input.value = '';
+  if (!f) return;
+  if (f.size > 60 * 1024 * 1024) { showToast('STL trop gros (60 Mo max).'); return; }
+  try {
+    const tris = FAB.normalesSortantes(FAB.stlVersTris(await f.arrayBuffer()));
+    if (!tris.length) throw new Error('aucun triangle lu');
+    addMsg('system', `${f.name} : ${tris.length} triangles, analysé dans le navigateur (le fichier n'est pas envoyé).`);
+    loadTris(tris, f.name);
+  } catch (e) { addMsg('system', 'STL illisible : ' + (e.message || e)); }
+};
+
+function updateDesignHealth(geo) {
+  const el = document.getElementById('design-health');
+  if (!el) return;
+  el.style.display = 'block';
+
+  // Géométrie
+  const p2 = geo.attributes.position;
+  const triCount = geo.index ? geo.index.count/3 : (p2 ? p2.count/3 : 0);
+  let geoOk = triCount > 0;
+  if (p2) for (let i = 0; i < Math.min(p2.count, 30); i++) { if (isNaN(p2.getX(i))) { geoOk = false; break; } }
+  _dhSet('geo', geoOk ? 'pass' : 'fail', geoOk ? `${Math.round(triCount)} △` : 'ERREUR');
+
+  // Impression
+  geo.computeBoundingBox();
+  const sz = geo.boundingBox.getSize(new THREE.Vector3());
+  const maxDim = Math.max(sz.x, sz.y, sz.z);
+  const fitsPlate = sz.x <= _DH_BUILD.x && sz.y <= _DH_BUILD.y && sz.z <= _DH_BUILD.z;
+  const wallParam = currentSpec?.params?.wall ?? null;
+  const minWall   = wallParam !== null ? wallParam : Math.min(sz.x, sz.y, sz.z);
+  const overRatio = _dhOverhangRatio(geo);
+  if (!fitsPlate) {
+    _dhSet('print', 'fail', `${maxDim.toFixed(0)}mm > ${Math.max(_DH_BUILD.x,_DH_BUILD.y,_DH_BUILD.z)}mm lit`);
+  } else if (minWall < 0.4) {
+    _dhSet('print', 'fail', `Paroi ${minWall.toFixed(1)}mm < ∅buse`);
+  } else if (minWall < 0.8) {
+    _dhSet('print', 'warn', `Paroi ${minWall.toFixed(1)}mm fragile`);
+  } else if (overRatio > 0.12) {
+    _dhSet('print', 'warn', `Surplombs ~${Math.round(overRatio*100)}%`);
+  } else {
+    _dhSet('print', 'pass', 'PASS');
+  }
+
+  // Assemblage
+  const asmP = currentSpec?.params || {};
+  if (asmP.bore && asmP.bore > 0) {
+    _dhSet('asm', 'warn', `Bore ∅${asmP.bore}mm +0.30mm comp.`);
+  } else if (asmP.pivotDia && asmP.pivotDia > 0) {
+    _dhSet('asm', 'pass', `Pivot ∅${asmP.pivotDia}mm → logmt ∅${(asmP.pivotDia+0.40).toFixed(1)}mm`);
+  } else if (asmP.numHoles && asmP.numHoles > 0 && asmP.holeRadius) {
+    _dhSet('asm', 'pass', `${asmP.numHoles}×∅${(asmP.holeRadius*2).toFixed(0)}mm`);
+  } else {
+    _dhSet('asm', 'na', 'N/A');
+  }
+
+  // Coût + temps
+  const vol_cm3  = _dhVolume(geo) / 1000;
+  const fill     = 0.43;
+  const weight_g = vol_cm3 * _DH_MAT.density * fill;
+  const cost     = weight_g * _DH_MAT.cost_per_g;
+  const time_min = vol_cm3 * 18 * fill;
+  const cv = document.getElementById('dh-cost-val');
+  if (cv) cv.textContent = cost < 0.01 ? '< 0,01 €' : cost.toFixed(2).replace('.',',') + ' €';
+  const tv = document.getElementById('dh-time-val');
+  if (tv) {
+    if (time_min < 1) tv.textContent = '< 1 min';
+    else if (time_min < 60) tv.textContent = `${Math.round(time_min)} min`;
+    else tv.textContent = `${Math.floor(time_min/60)}h${String(Math.round(time_min%60)).padStart(2,'0')}`;
+  }
+}
+
+/* Backends tentés dans l'ordre : studio local (dev) → moteur public (prod).
+ * Si aucun ne répond, on revient au parser vitrine par mots-clés. */
+const _API_CANDIDATES = [
+  'http://localhost:4555/api/intent',
+  'http://127.0.0.1:4555/api/intent',
+  'https://moteur.deligny-rd.fr/api/intent',
+];
+let _apiUrl = null;
+
+async function _resolveApi() {
+  if (_apiUrl) return _apiUrl;
+  for (const u of _API_CANDIDATES) {
+    try {
+      const r = await fetch(u, { method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({prompt:'ping',mode:'probe'}),
+        signal: AbortSignal.timeout(1500) });
+      if (r.ok || r.status < 500) { _apiUrl = u; return u; }
+    } catch {}
+  }
+  return null;
+}
+
+window.sendPrompt = async () => {
+  const ta = document.getElementById('prompt');
+  const text = ta.value.trim(); if (!text) return;
+  ta.value = ''; ta.style.height = 'auto';
+  const btn = document.getElementById('send-btn'); btn.disabled = true;
+  addMsg('user', text);
+  const thinking = addMsg('ai', '…');
+  try {
+    let spec = null;
+
+    // 1. Backend (local ou public)
+    const apiUrl = await _resolveApi();
+    if (apiUrl) {
+      try {
+        const r = await fetch(apiUrl, {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({prompt: text, mode:'create'}),
+          signal: AbortSignal.timeout(30000),
+        });
+        if (r.ok) {
+          const data = await r.json();
+          if (data.spec?.type && data.spec.type !== 'unsupported') spec = data.spec;
+        }
+      } catch { _apiUrl = null; }
+    }
+
+    // 2. Fallback parser vitrine
+    if (!spec) {
+      const v = vitrineAnalyse(text);
+      if (v?.type) spec = { type: v.type, params: v.params || {} };
+    }
+
+    if (!spec) throw new Error('forme non reconnue — essaie « lampe », « vase », « table », « chaise », « boîte », « engrenage », « gyroïde », « ressort », « tore »');
+
+    const { type, params } = spec;
+    let lbl = type;
+    if (params && Object.keys(params).length) lbl += ' — ' + paramSummary(params);
+    thinking.querySelector('.bubble').textContent = lbl;
+    loadShape(type, params || {});
+  } catch(e) { thinking.querySelector('.bubble').textContent = `Erreur : ${e.message}`; }
+  btn.disabled = false; ta.focus();
+};
+window.fillPrompt = t => { document.getElementById('prompt').value = t; document.getElementById('prompt').focus(); };
+function paramSummary(p) { return Object.entries(p).slice(0,5).map(([k,v])=>`${k}:${v}`).join(' '); }
+function addMsg(role, text) {
+  if (emptyEl) { emptyEl.remove(); emptyEl = null; }
+  const d = document.createElement('div'); d.className = `msg ${role}`;
+  const b = document.createElement('span'); b.className = 'bubble'; b.textContent = text;
+  d.appendChild(b); msgsEl.appendChild(d); msgsEl.scrollTop = msgsEl.scrollHeight;
+  return d;
+}
+
+// ── BOOT ──────────────────────────────────────────────
+initThree();
+initChat();
+updateBlenderStatus();
+setInterval(updateBlenderStatus, 9000);
+</script>
+<img src="https://atlas-studio.pro/deligny/api/px?page=generative-design" alt="" width="1" height="1" loading="eager">
+</body>
+</html>

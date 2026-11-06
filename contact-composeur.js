@@ -1,0 +1,277 @@
+/* COMPOSEUR DE DEMANDE — page contact de deligny-rd.fr
+ *
+ * POURQUOI. La page n'offrait que « contact@deligny-rd.fr » et un bouton
+ * mailto vide. Un visiteur convaincu devait quitter le site, ouvrir son
+ * client mail, et formuler seul sa demande depuis une page blanche : c'est le
+ * moment ou l'on renonce. Mais la page assume aussi « pas de formulaire a
+ * rallonge », et c'est une bonne ligne : un formulaire de dix champs ferait
+ * fuir autant.
+ *
+ * D'OU CE COMPROMIS : trois clics, pas un formulaire. On choisit un sujet, on
+ * donne une echeance et deux phrases, et le courriel part DEJA REDIGE, avec un
+ * objet clair et une demande structuree. Le visiteur n'affronte jamais la page
+ * blanche, et la demande arrive exploitable.
+ *
+ * ENVOI REEL DEPUIS LA PAGE (30/09/2026). Le mailto seul ne suffisait pas :
+ * un visiteur sans logiciel de courriel configure (webmail, poste
+ * d'entreprise, telephone d'emprunt) cliquait dans le vide, et son message
+ * n'existait nulle part. Le bouton envoie donc au serveur
+ * atlas-studio.pro/deligny/api/message, qui range le message dans la file
+ * relue par l'atelier et previent par courriel. Le mailto RESTE, en second :
+ * qui prefere son propre logiciel garde ce chemin, et si l'envoi echoue le
+ * lien deja redige est la pour que rien ne soit perdu.
+ *
+ * Le site reste statique : c'est un appel a une API, pas un back-end de page.
+ * La CSP de contact.html s'ouvre donc d'un cran, et d'un seul :
+ * `connect-src https://atlas-studio.pro`. Jamais 'unsafe-inline'.
+ *
+ * Fichier servi, jamais inline : la CSP du site est `script-src 'self'` et un
+ * inline y serait bloque SANS BRUIT (incident du 25/08).
+ */
+(function () {
+  var hote = document.getElementById('composeur');
+  if (!hote) return;
+
+  // Les identifiants correspondent aux cartes du store (section Offre) : un
+  // lien « ?sujet=heberge » depuis une carte arrive ici avec le bon choix deja
+  // fait, et le visiteur n'a plus qu'a ecrire deux phrases.
+  var SUJETS = [
+    { id: 'logiciel',    titre: 'Un logiciel sur mesure',          objet: 'Projet logiciel' },
+    { id: 'saas',        titre: 'Atlas en abonnement',             objet: 'Abonnement Atlas Studio Pro' },
+    { id: 'site',        titre: 'Un site internet',                objet: 'Site internet' },
+    { id: 'heberge',     titre: 'Heberger ou infogerer',           objet: 'Hebergement' },
+    { id: 'agent',       titre: 'Automatiser des taches',          objet: 'Agent AI et automatisation' },
+    { id: 'fabrication', titre: 'Concevoir ou fabriquer un objet', objet: 'Conception et fabrication' },
+    { id: 'autre',       titre: 'Autre chose',                     objet: 'Prise de contact' },
+  ];
+  var DELAIS = ['Des que possible', 'Dans le mois', 'Ce trimestre', 'Pas encore fixe'];
+
+  var choix = { sujet: null, delai: null };
+
+  function bouton(txt, actif) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cp-choix' + (actif ? ' on' : '');
+    b.textContent = txt;
+    return b;
+  }
+
+  function ligne(legende, options, cle, apres) {
+    var d = document.createElement('div');
+    d.className = 'cp-ligne';
+    var l = document.createElement('span');
+    l.className = 'cp-legende';
+    l.textContent = legende;
+    d.appendChild(l);
+    var zone = document.createElement('div');
+    zone.className = 'cp-options';
+    options.forEach(function (o) {
+      var texte = o.titre || o;
+      var b = bouton(texte, false);
+      b.onclick = function () {
+        choix[cle] = o;
+        [].forEach.call(zone.children, function (x) { x.classList.remove('on'); });
+        b.classList.add('on');
+        if (apres) apres();
+        majEtat();
+      };
+      zone.appendChild(b);
+    });
+    d.appendChild(zone);
+    return d;
+  }
+
+  // ── Construction ──────────────────────────────────────────────────────
+  hote.appendChild(ligne('Je viens pour', SUJETS, 'sujet'));
+  hote.appendChild(ligne('Echeance', DELAIS, 'delai'));
+
+  var champ = document.createElement('textarea');
+  champ.className = 'cp-texte';
+  champ.rows = 3;
+  champ.placeholder = 'En deux phrases : ce que vous cherchez, et pour qui.';
+  champ.setAttribute('aria-label', 'Votre demande, en deux phrases');
+  hote.appendChild(champ);
+
+  // Sans adresse, le serveur ne peut pas repondre : c'est le seul champ ajoute.
+  var courriel = document.createElement('input');
+  courriel.type = 'email';
+  courriel.className = 'cp-courriel';
+  courriel.autocomplete = 'email';
+  courriel.placeholder = 'Votre adresse, pour la reponse';
+  courriel.setAttribute('aria-label', 'Votre adresse de courriel');
+  hote.appendChild(courriel);
+
+  /* LEURRE ANTI-ROBOT. Un champ hors de l'ecran, hors tabulation, sans nom
+   * qu'un gestionnaire de mots de passe voudrait remplir : un humain ne le
+   * voit pas, un robot qui remplit tout se denonce. Le masquage passe par une
+   * classe de styles.css, pas par un style inline, que la CSP bloquerait. */
+  var leurre = document.createElement('div');
+  leurre.className = 'cp-leurre';
+  leurre.setAttribute('aria-hidden', 'true');
+  var leurreChamp = document.createElement('input');
+  leurreChamp.type = 'text';
+  leurreChamp.name = 'laisser_vide';
+  leurreChamp.tabIndex = -1;
+  leurreChamp.autocomplete = 'off';
+  leurre.appendChild(leurreChamp);
+  hote.appendChild(leurre);
+
+  var actions = document.createElement('div');
+  actions.className = 'cp-actions';
+  var envoyer = document.createElement('button');
+  envoyer.type = 'button';
+  envoyer.className = 'btn btn-small btn-primary cp-envoyer';
+  envoyer.textContent = 'Envoyer le message';
+  envoyer.setAttribute('aria-disabled', 'true');
+  actions.appendChild(envoyer);
+  var lienMail = document.createElement('a');
+  lienMail.className = 'cp-lien-mail';
+  lienMail.textContent = 'ou l’ouvrir dans mon logiciel de courriel';
+  actions.appendChild(lienMail);
+  hote.appendChild(actions);
+
+  // Region d'etat annoncee aux lecteurs d'ecran : un envoi qui ne dit rien
+  // equivaut a un envoi rate.
+  var etat = document.createElement('p');
+  etat.className = 'cp-etat';
+  etat.setAttribute('role', 'status');
+  etat.hidden = true;
+  hote.appendChild(etat);
+
+  var note = document.createElement('p');
+  note.className = 'cp-note';
+  note.textContent = 'Le message part vers l’atelier et vous recevez la reponse a l’adresse donnee. Aucun compte, aucun mouchard : la mesure d’audience est decrite dans les mentions legales.';
+  hote.appendChild(note);
+
+  // Un robot remplit un formulaire en moins d'une seconde : on retient l'heure
+  // d'arrivee pour que le serveur puisse ecarter ce qui est trop rapide.
+  var arrivee = Date.now();
+
+  function majEtat() {
+    var pret = !!choix.sujet;
+    envoyer.setAttribute('aria-disabled', pret ? 'false' : 'true');
+    if (!pret) { lienMail.removeAttribute('href'); return; }
+
+    var objet = 'DELIGNY R&D — ' + choix.sujet.objet;
+    var corps = [
+      'Bonjour,',
+      '',
+      (choix.mode === 'devis'
+        ? 'Demande : un devis personnalise pour ' + choix.sujet.titre.toLowerCase() + '.'
+        : choix.mode === 'offre'
+          ? 'Demande : l\'offre « ' + choix.sujet.titre + ' », telle que presentee sur le site.'
+          : 'Demande : ' + choix.sujet.titre + '.'),
+      'Echeance : ' + (choix.delai || 'a preciser') + '.',
+      '',
+      (champ.value.trim() || '[decrivez votre besoin en deux phrases]'),
+      '',
+      '—',
+      'Envoye depuis deligny-rd.fr/contact.html',
+    ].join('\n');
+
+    lienMail.href = 'mailto:contact@deligny-rd.fr'
+      + '?subject=' + encodeURIComponent(objet)
+      + '&body=' + encodeURIComponent(corps);
+  }
+
+  /* PRE-REMPLISSAGE DEPUIS LE STORE.
+   * Une carte de l'offre mene ici avec ?sujet=<id> et ?mode=offre|devis. Le
+   * sujet est alors deja coche : le visiteur arrive dans une conversation
+   * commencee, pas devant un questionnaire. Le mode change seulement la phrase
+   * d'entree du courriel — prendre l'offre telle quelle, ou demander du sur
+   * mesure — car ce sont deux intentions differentes pour la meme prestation. */
+  var params = new URLSearchParams(location.search);
+  var vise = params.get('sujet');
+  var mode = params.get('mode') === 'devis' ? 'devis' : (params.get('mode') === 'offre' ? 'offre' : null);
+
+  if (vise) {
+    var idx = -1;
+    SUJETS.forEach(function (o, i) { if (o.id === vise) idx = i; });
+    if (idx >= 0) {
+      var pastilles = hote.querySelectorAll('.cp-ligne')[0].querySelectorAll('.cp-choix');
+      if (pastilles[idx]) pastilles[idx].click();
+    }
+  }
+  if (mode === 'devis') {
+    champ.placeholder = 'Votre contexte en deux phrases : le besoin, et pour combien de personnes.';
+  } else if (mode === 'offre') {
+    champ.placeholder = 'Deux phrases sur votre situation, pour qu\'on cadre l\'offre.';
+  }
+  choix.mode = mode;
+
+  champ.addEventListener('input', majEtat);
+  courriel.addEventListener('input', function () { montre('', ''); });
+
+  function montre(texte, genre) {
+    etat.textContent = texte;
+    etat.className = 'cp-etat' + (genre ? ' cp-' + genre : '');
+    etat.hidden = !texte;
+  }
+
+  function signaleManque(indice) {
+    var l = hote.querySelectorAll('.cp-ligne')[indice];
+    if (!l) return;
+    l.classList.add('cp-manque');
+    setTimeout(function () { l.classList.remove('cp-manque'); }, 1200);
+  }
+
+  envoyer.addEventListener('click', function () {
+    if (envoyer.getAttribute('aria-disabled') === 'true') {
+      // Sans sujet choisi il n'y a rien a envoyer : on montre ou ca manque au
+      // lieu de laisser un clic sans effet.
+      montre('Choisissez d’abord ce qui vous amene.', 'ko');
+      signaleManque(0);
+      return;
+    }
+    var adresse = courriel.value.trim();
+    if (adresse.indexOf('@') < 1 || adresse.indexOf('.', adresse.indexOf('@')) < 0) {
+      montre('Il manque votre adresse de courriel, sans quoi la reponse ne peut pas vous arriver.', 'ko');
+      courriel.focus();
+      return;
+    }
+    if (champ.value.trim().length < 20) {
+      montre('Deux phrases suffisent, mais il en faut deux : dites ce que vous cherchez.', 'ko');
+      champ.focus();
+      return;
+    }
+    envoyer.disabled = true;
+    montre('Envoi…', '');
+    var charge = {
+      sujet: choix.sujet.id,
+      delai: choix.delai || '',
+      mode: choix.mode || '',
+      nom: '',
+      courriel: adresse,
+      message: champ.value.trim(),
+      page: 'contact',
+      ms: Date.now() - arrivee,
+      laisser_vide: leurreChamp.value
+    };
+    fetch('https://atlas-studio.pro/deligny/api/message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(charge)
+    }).then(function (r) {
+      return r.json().then(function (j) { return { code: r.status, corps: j }; });
+    }).then(function (rep) {
+      if (rep.code === 200 && rep.corps && rep.corps.ok) {
+        montre(rep.corps.message || 'Message recu.', rep.corps.notifie === false ? 'ko' : 'ok');
+        if (rep.corps.notifie !== false) {
+          champ.value = '';
+          majEtat();
+        }
+        return;
+      }
+      // Un refus explique se dit tel quel : le visiteur peut corriger.
+      montre((rep.corps && rep.corps.error) || 'Envoi refuse.', 'ko');
+      envoyer.disabled = false;
+    }).catch(function () {
+      // Reseau coupe, API arretee : plutot que de perdre le message, on renvoie
+      // le visiteur vers le mailto deja redige, qui ne depend de personne.
+      montre('L’envoi n’a pas abouti. Le lien « ou l’ouvrir dans mon logiciel de courriel » contient deja votre message.', 'ko');
+      envoyer.disabled = false;
+    });
+  });
+
+  majEtat();
+})();
