@@ -1795,7 +1795,11 @@ function grilleSeparee(N,M){coupeZone.lisse=false;
       const r=separer(g,C.H,C.LI,C.D);
       /* reliefs au profil lisse (embossage, bas-reliefs) : normales de la surface ENTIERE (ponderees par l'aire, aucune
          couture poli / brut) -> parois sans reflet en zigzag. Les aretes vives gardent leur angle de cassure. */
-      if(state.lunette.motif!=='arete'){g.computeVertexNormals();for(const q of r)q.setAttribute('normal',g.getAttribute('normal'));coupeZone.lisse=true;}else coupeZone.lisse=false;
+      /* (18/11, Baptiste : « la reflexion zigzag ») EMBOSSAGE en poli surface : les normales de la surface ENTIERE melangeaient,
+         le long du bord poli / creux, la normale du dessus plat et celle de la paroi : les triangles du bord, alternes par la
+         grille, renvoyaient un reflet en dents de scie. L'embossage prend donc des normales PAR GROUPE a angle de cassure
+         (autoLisse) : le dessus reste plat jusqu'a l'arete, les parois restent lisses entre elles. */
+      if(!['arete','embossage'].includes(state.lunette.motif)){g.computeVertexNormals();for(const q of r)q.setAttribute('normal',g.getAttribute('normal'));coupeZone.lisse=true;}else coupeZone.lisse=false;
       return r;}}
   const Z=zoneAjustee(N,M),H=Z.H,NV=Z.NV,g=indexGrille(N,M,Z.P,Z.H,Z.LI,Z.D);
   /* POLI SURFACE, ECRAN SEULEMENT (12/10, Baptiste) : le polissage casse l'arete des sommets -> on arrondit les
@@ -1827,10 +1831,15 @@ function separer(g,H,LI,D){
   const I=g.index.array,haut=[],bas=[];
   // embossage : un triangle est poli s'il est ENTIEREMENT sur la surface d'origine (ses 3 sommets ; le bord du creux est
   // une chaine de sommets, voir zoneAjustee) -> limite poli / brut nette, sans dents de scie
-  const emb=m==='embossage'&&fin===1,dOk=D&&D.some(Number.isFinite);   // (14/10) avec la distance au contour (calee) : limite poli / brut exactement sur le contour
+  const emb=m==='embossage'&&fin===1,dOk=D&&D.some(Number.isFinite);
+  /* (18/11, Baptiste : « il y a des surfaces qui doivent etre polies : si la face chanfreinee est plate elle doit etre polie, et
+     le dessus pareil ») : dans les MARGES plates de la zone (0,5 mm de chaque bord : portee du verre, arete), le motif est
+     coupe (garde = 0) et la distance au contour n'est pas calculee (NaN) : ces triangles tombaient dans le brut alors qu'ils
+     sont sur la surface d'origine. Sans distance, la hauteur decide : a fleur de la surface d'origine = polie. */
+  const dd=v=>Number.isFinite(D[v])?D[v]:(H[v]>-2e-4?1:-1);   // (14/10) avec la distance au contour (calee) : limite poli / brut exactement sur le contour
   // lisere : bande polie (sauf finition mate), ses 3 sommets dans la bande ou sur son bord
   const lis=LI&&fin!==0?t=>LI[I[t]]<=1e-6&&LI[I[t+1]]<=1e-6&&LI[I[t+2]]<=1e-6:()=>false;
-  for(let t=0;t<I.length;t+=3){const a=H[I[t]],b=H[I[t+1]],c=H[I[t+2]];(lis(t)||(emb&&dOk?Math.min(D[I[t]],D[I[t+1]],D[I[t+2]])>-1e-4:emb?Math.min(a,b,c)>(w1Actif()&&_W1&&_W1.paves?-.85*(p.profondeur||.35):-2e-4):poli((a+b+c)/3)))?haut.push(I[t],I[t+1],I[t+2]):bas.push(I[t],I[t+1],I[t+2]);}
+  for(let t=0;t<I.length;t+=3){const a=H[I[t]],b=H[I[t+1]],c=H[I[t+2]];(lis(t)||(emb&&dOk?Math.min(dd(I[t]),dd(I[t+1]),dd(I[t+2]))>-1e-4:emb?Math.min(a,b,c)>(w1Actif()&&_W1&&_W1.paves?-.85*(p.profondeur||.35):-2e-4):poli((a+b+c)/3)))?haut.push(I[t],I[t+1],I[t+2]):bas.push(I[t],I[t+1],I[t+2]);}
   const mk=ix=>{const n=new THREE.BufferGeometry();n.setAttribute('position',g.getAttribute('position'));n.setAttribute('color',g.getAttribute('color'));n.setIndex(ix);return n;};
   return [mk(haut),mk(bas)];}
 // ── MAILLAGE PARAMETRIQUE DES RESEAUX (12/10, Baptiste : « la 3D la plus propre et la plus parfaite possible,
@@ -2257,7 +2266,8 @@ for(const m of REEL){const f=FC[m];FC[m]=(x,z,r,t,p)=>sousAiguilles(f(x,z,r,t,p)
 // ───────────────────────────── scene ─────────────────────────────
 const vue=document.getElementById('vue');
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,preserveDrawingBuffer:true});
-renderer.setPixelRatio(Math.min(2,devicePixelRatio)); renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=.8;   // scene 20 % moins lumineuse (08/10)
+const DPR_ECRAN=+new URLSearchParams(location.search).get('dpr')||devicePixelRatio;   // ?dpr=1 : simule un ecran 1x (essais du surechantillonnage)
+renderer.setPixelRatio(Math.min(2,DPR_ECRAN)); renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=.8;   // scene 20 % moins lumineuse (08/10)
 vue.prepend(renderer.domElement);renderer.domElement.style.opacity='0';renderer.domElement.style.transition='opacity .35s';   // montree seulement en HD (verifierPret)
 const scene=new THREE.Scene();
 const envAtelier=new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(),.04).texture;scene.environment=envAtelier;
@@ -2293,7 +2303,7 @@ scene.add(new THREE.HemisphereLight(0xffffff,0x9a958a,.5));
 // lumiere rasante : c'est elle qui fait lire les strates et les aretes
 const rasante=new THREE.DirectionalLight(0xfff4e6,1.4); rasante.position.set(-42,66,-42); scene.add(rasante);   // lumiere principale haute (~50°) venant de 10 h 30 : ombres portees vers 4 h 30, en 3/4
 // OMBRES : la lumiere rasante porte des ombres douces (aiguilles sur le cadran, lunette, relief, bracelet)
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;if(matchMedia('(pointer:coarse)').matches)renderer.setPixelRatio(Math.min(1.5,devicePixelRatio));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;if(matchMedia('(pointer:coarse)').matches)renderer.setPixelRatio(Math.min(1.5,DPR_ECRAN));
 rasante.castShadow=true;rasante.shadow.mapSize.set(2048,2048);rasante.shadow.bias=-.0004;rasante.shadow.normalBias=.02;rasante.shadow.radius=3;
 Object.assign(rasante.shadow.camera,{left:-45,right:45,top:45,bottom:-45,near:1,far:200});rasante.shadow.camera.updateProjectionMatrix();
 const zenith=new THREE.DirectionalLight(0xffffff,.35);zenith.position.set(-8,80,12);zenith.castShadow=false;   // une seule ombre nette (celle de la lumiere principale)
@@ -3097,8 +3107,17 @@ renderer.shadowMap.autoUpdate=false;renderer.shadowMap.needsUpdate=true;
 let _sale=true,_ombreSale=true,_bouge=0,_derniere=0,_secu=0;const DPR_PLEIN=renderer.getPixelRatio(),PALIERS=[DPR_PLEIN,1.25,1].filter((v,i,a)=>!i||v<a[0]);let _pal=0,_lent=0;
 let _palGeste=0;try{_palGeste=Math.min(PALIERS.length-1,parseInt(localStorage.getItem('montre-palier-geste')||'0')||0);}catch(e){}
 const poserPalier=p=>{if(p===_pal)return;_pal=p;_lent=0;renderer.setPixelRatio(PALIERS[p]);_sale=true;};
-const retenirPalier=p=>{if(p>_palGeste){_palGeste=p;try{localStorage.setItem('montre-palier-geste',String(p));}catch(e){}}};
-const debutGeste=()=>{_bouge=performance.now();_sale=true;if(_palGeste&&!_pal)poserPalier(_palGeste);};
+/* (18/11, Baptiste : « antialiasing possible ? ») SURECHANTILLONNAGE AU REPOS. Le MSAA du navigateur (antialias:true) lisse
+   les aretes mais pas les details fins des reliefs (guillochage, grain, aretes de la lunette) : sur un ecran en 1x
+   ils scintillent en escalier. Quand la montre est immobile depuis 0,4 s, on la rend UNE fois a 2x la definition de
+   l'ecran (le navigateur reduit ensuite l'image : c'est du SSAA 4 echantillons par pixel, en plus du MSAA) ; au
+   moindre geste ou reglage, retour immediat a la definition normale. Ecrans deja en 2x ou plus (Retina, iPhone) et
+   ecrans tactiles : inchange (deja assez fins, et la batterie compte). */
+const SSAA_MAX=2,PAS_TACTILE=!matchMedia('(pointer:coarse)').matches,SSAA_OK=DPR_PLEIN<SSAA_MAX&&PAS_TACTILE;let _ssaa=false;window.__ssaa=()=>({ok:SSAA_OK,actif:_ssaa,ratio:renderer.getPixelRatio()});
+const finRepos=()=>{if(_ssaa){_ssaa=false;renderer.setPixelRatio(PALIERS[_pal]);_sale=true;}};
+const debutRepos=()=>{if(!SSAA_OK||_ssaa||_pal)return;const c=renderer.domElement,w=c.clientWidth*SSAA_MAX,h=c.clientHeight*SSAA_MAX;
+  if(w*h>9e6||w>8192||h>8192)return;_ssaa=true;renderer.setPixelRatio(SSAA_MAX);_sale=true;};
+const debutGeste=()=>{finRepos();_bouge=performance.now();_sale=true;if(_palGeste&&!_pal)poserPalier(_palGeste);};
 /* (13/11) TRAVAIL DE FOND SEULEMENT QUAND LA MONTRE EST AU REPOS. Sur iPhone 17, « la 3D saccade au debut quand je la
    manipule » : le visiteur tourne la montre pendant que l'environnement HDR se convertit (PMREM, carte graphique
    occupee), que le modele par defaut se decode et que les vignettes du panneau se calculent, tout sur le meme fil que
@@ -3109,11 +3128,12 @@ const marquerScene=()=>{_sale=true;_ombreSale=true;};window.__rafraichir=marquer
 {const add0=THREE.Object3D.prototype.add,rem0=THREE.Object3D.prototype.remove;
  THREE.Object3D.prototype.add=function(...o){marquerScene();return add0.apply(this,o);};THREE.Object3D.prototype.remove=function(...o){marquerScene();return rem0.apply(this,o);};
  const ld=THREE.DefaultLoadingManager,o0=ld.onLoad;ld.onLoad=(...a)=>{marquerScene();if(o0)o0(...a);};}
-ctl.addEventListener('change',()=>{_sale=true;_bouge=performance.now();});addEventListener('resize',()=>{_sale=true;});if(window.ResizeObserver)new ResizeObserver(()=>{_sale=true;}).observe(renderer.domElement);
-for(const e of ['pointerdown','keydown','input','change','click','wheel','touchstart'])addEventListener(e,ev=>{const t=performance.now();if(ev.target===renderer.domElement){debutGeste();return;}_sale=true;setTimeout(()=>{_sale=true;},150);setTimeout(marquerScene,600);setTimeout(()=>{_sale=true;},1500);},{capture:true,passive:true});
+ctl.addEventListener('change',()=>{finRepos();_sale=true;_bouge=performance.now();});addEventListener('resize',()=>{_sale=true;});if(window.ResizeObserver)new ResizeObserver(()=>{_sale=true;}).observe(renderer.domElement);
+for(const e of ['pointerdown','keydown','input','change','click','wheel','touchstart'])addEventListener(e,ev=>{const t=performance.now();finRepos();if(ev.target===renderer.domElement){debutGeste();return;}_sale=true;setTimeout(()=>{_sale=true;},150);setTimeout(marquerScene,600);setTimeout(()=>{_sale=true;},1500);},{capture:true,passive:true});
 (function boucle(t){requestAnimationFrame(boucle);const bouge=ctl.update();if(bouge)_sale=true;
-  if(t-_secu>1000){_secu=t;_sale=true;if(t-_bouge>250)_ombreSale=true;}   // pas de carte d'ombre pendant le geste : tourner la montre ne la change pas
+  if(t-_secu>(_ssaa?4000:1000)){_secu=t;_sale=true;if(t-_bouge>250)_ombreSale=true;}   // pas de carte d'ombre pendant le geste : tourner la montre ne la change pas
   if(_pal&&t-_bouge>250)poserPalier(0);   // retour pleine definition, file graphique vide
+  if(!_ssaa&&SSAA_OK&&!_pal&&t-_bouge>400)debutRepos();   // image fixe : une passe surechantillonnee
   if(!_sale)return;_sale=false;
   if(_ombreSale){ombres();renderer.shadowMap.needsUpdate=true;_ombreSale=false;}
   const dt=t-_derniere;_derniere=t;
